@@ -50,7 +50,7 @@ const couchImageGenerationFlow = ai.defineFlow(
       prompt: [
         {media: {url: baseImageUrl}},
         {media: {url: input.photoDataUri, contentType}},
-        {text: 'Take the subject from the second image and place it sitting on the center of the white couch in the first image. Do not change anything else in the first image. The people and background of the first image must remain exactly the same.'},
+        {text: 'You are an expert photo editor. The first image is the background. The second image contains the subject. Your task is to perfectly composite the subject from the second image onto the couch in the first image. The subject should appear to be sitting on the couch. It is critical that you DO NOT change the background image (the first image) at all.'},
       ],
       config: {
         responseModalities: ['TEXT', 'IMAGE'],
