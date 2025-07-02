@@ -53,8 +53,8 @@ export function ImageUploader({ onGenerationComplete }: ImageUploaderProps) {
     } catch (error) {
       console.error(error);
       toast({
-        title: 'Generation Failed',
-        description: 'Something went wrong while creating your couch vibe. Please try again.',
+        title: 'Unable to Generate Image',
+        description: 'Your upload may not have a clear subject or could violate our content policy. Please try a different image.',
         variant: 'destructive',
       });
     } finally {
