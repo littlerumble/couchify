@@ -4,7 +4,7 @@ import { useState, useRef, type DragEvent } from 'react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { UploadCloud, Loader2, Share2, CornerDownRight } from 'lucide-react';
 import { couchImageGeneration } from '@/ai/flows/couch-image-generation';
 import { useToast } from '@/hooks/use-toast';
