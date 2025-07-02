@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { UploadCloud, Loader2, Share2, CornerDownRight } from 'lucide-react';
+import { UploadCloud, Loader2, Share2 } from 'lucide-react';
 import { couchImageGeneration } from '@/ai/flows/couch-image-generation';
 import { useToast } from '@/hooks/use-toast';
 
@@ -108,21 +108,15 @@ export function ImageUploader({ onGenerationComplete }: ImageUploaderProps) {
     );
   }
 
-  if (generatedImage && uploadedImage) {
+  if (generatedImage) {
     return (
-      <Card className="w-full max-w-xl mx-auto overflow-hidden">
+      <Card className="w-full max-w-lg mx-auto overflow-hidden">
         <CardHeader className="p-4 bg-secondary/50">
             <h3 className="font-headline text-lg text-center font-semibold">Your Couch Creation</h3>
         </CardHeader>
-        <CardContent className="p-2 md:p-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4 items-center">
-            <Image src={uploadedImage} alt="Uploaded image" width={400} height={400} className="rounded-lg aspect-square object-cover" />
-            <div className="hidden md:flex justify-center">
-                <CornerDownRight className="h-12 w-12 text-primary/50" />
-            </div>
-            <Image src={generatedImage} alt="Generated couch image" width={400} height={400} className="rounded-lg aspect-square object-cover" data-ai-hint="couch creation" />
-          </div>
-          <div className="mt-4 text-center space-y-4">
+        <CardContent className="p-4 flex flex-col items-center">
+          <Image src={generatedImage} alt="Generated couch image" width={400} height={400} className="rounded-lg aspect-square object-cover" data-ai-hint="couch creation" />
+          <div className="mt-6 text-center space-y-4 w-full">
              <p className="text-muted-foreground font-medium">Share this with your friends 🔥 #CouchVibes</p>
              <div className="flex justify-center gap-2">
                 <Button size="sm">

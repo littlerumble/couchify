@@ -6,9 +6,6 @@ import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
 import { ImageUploader } from '@/components/image-uploader';
 import { RecentGallery } from '@/components/recent-gallery';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { ArrowRight } from 'lucide-react';
 
 type CouchImage = {
   src: string;
@@ -56,69 +53,16 @@ export default function Home() {
                 Put your vibes on the Couch <span className="inline-block animate-wave">🛋️</span>
               </h1>
               <p className="text-lg md:text-xl text-foreground/80">
-                Powered by AI &amp; <span className="font-bold text-primary">$COUCH</span>
+                Upload an image below to couchify it.
               </p>
               
               <ImageUploader onGenerationComplete={handleGenerationComplete} />
-              <p className="text-muted-foreground text-sm">
-                Upload any image. We'll generate a version of it sitting comfortably on a couch.
-              </p>
             </div>
           </div>
         </section>
 
         <RecentGallery images={recentImages} />
-
-        <section id="about" className="w-full py-12 md:py-24 lg:py-32 bg-secondary/50">
-          <div className="container px-4 md:px-6">
-            <div className="grid gap-10 lg:grid-cols-2 lg:gap-16 items-center">
-              <div className="space-y-4">
-                <h2 className="font-headline text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">What is $COUCH?</h2>
-                <p className="max-w-[600px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-                  $COUCH is more than just a meme coin; it's a community-driven project that brings fun and creativity to the crypto space. Our goal is to build a vibrant ecosystem powered by AI and Web3 technologies, where everyone can relax, create, and share.
-                </p>
-                <div className="flex flex-col gap-2 min-[400px]:flex-row">
-                  <Button size="lg" asChild>
-                    <a href="#" target="_blank" rel="noopener noreferrer">
-                      Buy $COUCH on Solana DEX
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </a>
-                  </Button>
-                   <Button size="lg" variant="secondary" asChild>
-                    <a href="#" target="_blank" rel="noopener noreferrer">
-                      Learn More
-                    </a>
-                  </Button>
-                </div>
-              </div>
-              <div className="grid gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="font-headline">Tokenomics</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex justify-between">
-                      <span>Total Supply:</span>
-                      <span className="font-mono font-medium">1,000,000,000 $COUCH</span>
-                    </div>
-                     <div className="flex justify-between">
-                      <span>Utility:</span>
-                      <span className="font-medium">Powering AI tools, community voting</span>
-                    </div>
-                     <div className="flex justify-between">
-                      <span>Tax:</span>
-                      <span className="font-mono font-medium">0/0</span>
-                    </div>
-                     <div className="flex justify-between">
-                      <span>Liquidity:</span>
-                      <span className="font-medium">Burnt Forever</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </div>
-        </section>
+        
       </main>
       <Footer />
     </div>
