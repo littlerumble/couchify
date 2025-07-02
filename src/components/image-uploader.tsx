@@ -117,7 +117,7 @@ export function ImageUploader({ onGenerationComplete }: ImageUploaderProps) {
         <CardContent className="p-4 flex flex-col items-center">
           <Image src={generatedImage} alt="Generated couch image" width={600} height={400} className="rounded-lg aspect-video object-cover w-full" data-ai-hint="couch creation" />
           <div className="mt-6 text-center space-y-4 w-full">
-             <p className="text-muted-foreground font-medium">Share this with your friends 🔥 #CouchVibes</p>
+             <p className="text-muted-foreground font-medium">Share this with your friends 🔥</p>
              <div className="flex justify-center gap-2">
                 <Button size="sm">
                     <Share2 className="mr-2 h-4 w-4" />
