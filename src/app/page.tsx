@@ -50,11 +50,8 @@ export default function Home() {
           <div className="container px-4 md:px-6">
             <div className="max-w-3xl mx-auto space-y-6">
               <h1 className="font-headline text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl">
-                Put your vibes on the Couch <span className="inline-block animate-wave">🛋️</span>
+                Upload image to couchify
               </h1>
-              <p className="text-lg md:text-xl text-foreground/80">
-                Upload an image below to couchify it.
-              </p>
               
               <ImageUploader onGenerationComplete={handleGenerationComplete} />
             </div>

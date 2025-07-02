@@ -10,7 +10,7 @@ export function Header() {
       <div className="container flex h-16 max-w-screen-2xl items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
           <Sofa className="h-6 w-6 text-primary" />
-          <span className="font-headline text-lg font-semibold">Couch Vibes</span>
+          <span className="font-headline text-lg font-semibold">$COUCH on Solana</span>
         </Link>
         <nav className="flex items-center gap-4">
            <Button asChild>
