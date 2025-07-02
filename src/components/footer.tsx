@@ -1,7 +1,6 @@
 import Link from 'next/link';
-import { Twitter, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { DiscordIcon } from '@/components/icons';
+import { XIcon } from '@/components/icons';
 
 export function Footer() {
   return (
@@ -14,18 +13,8 @@ export function Footer() {
         </div>
         <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" asChild>
-                <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" aria-label="Twitter">
-                    <Twitter className="h-5 w-5" />
-                </a>
-            </Button>
-            <Button variant="ghost" size="icon" asChild>
-                <a href="https://telegram.org" target="_blank" rel="noopener noreferrer" aria-label="Telegram">
-                    <Send className="h-5 w-5" />
-                </a>
-            </Button>
-            <Button variant="ghost" size="icon" asChild>
-                <a href="https://discord.com" target="_blank" rel="noopener noreferrer" aria-label="Discord">
-                    <DiscordIcon className="h-5 w-5" />
+                <a href="https://x.com" target="_blank" rel="noopener noreferrer" aria-label="X">
+                    <XIcon className="h-5 w-5" />
                 </a>
             </Button>
         </div>
