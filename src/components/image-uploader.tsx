@@ -110,12 +110,12 @@ export function ImageUploader({ onGenerationComplete }: ImageUploaderProps) {
 
   if (generatedImage) {
     return (
-      <Card className="w-full max-w-lg mx-auto overflow-hidden">
+      <Card className="w-full max-w-2xl mx-auto overflow-hidden">
         <CardHeader className="p-4 bg-secondary/50">
             <h3 className="font-headline text-lg text-center font-semibold">Your Couch Creation</h3>
         </CardHeader>
         <CardContent className="p-4 flex flex-col items-center">
-          <Image src={generatedImage} alt="Generated couch image" width={400} height={400} className="rounded-lg aspect-square object-cover" data-ai-hint="couch creation" />
+          <Image src={generatedImage} alt="Generated couch image" width={600} height={400} className="rounded-lg aspect-video object-cover w-full" data-ai-hint="couch creation" />
           <div className="mt-6 text-center space-y-4 w-full">
              <p className="text-muted-foreground font-medium">Share this with your friends 🔥 #CouchVibes</p>
              <div className="flex justify-center gap-2">
