@@ -40,9 +40,9 @@ const couchImageGenerationFlow = ai.defineFlow(
     outputSchema: CouchImageGenerationOutputSchema,
   },
   async (input) => {
-    const contentType = input.photoDataUri.match(/data:([^;]+);base64,/)?.[1];
-    if (!contentType) {
-      throw new Error('Invalid data URI: could not determine content type.');
+    const userImageContentType = input.photoDataUri.match(/data:([^;]+);base64,/)?.[1];
+    if (!userImageContentType) {
+      throw new Error('Invalid data URI: could not determine content type for user image.');
     }
     
     // Read the base image from the file system
@@ -50,12 +50,13 @@ const couchImageGenerationFlow = ai.defineFlow(
     const imageBuffer = fs.readFileSync(baseImagePath);
     const base64Image = imageBuffer.toString('base64');
     const baseImageDataUri = `data:image/jpeg;base64,${base64Image}`;
+    const baseImageContentType = 'image/jpeg';
 
     const {media} = await ai.generate({
       model: 'googleai/gemini-2.0-flash-preview-image-generation',
       prompt: [
-        {media: {url: baseImageDataUri}},
-        {media: {url: input.photoDataUri, contentType}},
+        {media: {url: baseImageDataUri, contentType: baseImageContentType}},
+        {media: {url: input.photoDataUri, contentType: userImageContentType}},
         {text: 'You are an expert photo editor. The first image is the background. The second image contains the subject. Your task is to perfectly composite the subject from the second image onto the couch in the first image. The subject should appear to be sitting on the couch. It is critical that you DO NOT change the background image (the first image) at all.'},
       ],
       config: {
