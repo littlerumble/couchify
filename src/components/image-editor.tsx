@@ -4,17 +4,19 @@ import { useState, useRef, type DragEvent, type MouseEvent as ReactMouseEvent } 
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { UploadCloud, Download, RefreshCw, ZoomIn, RotateCw } from 'lucide-react';
+import { UploadCloud, Download, RefreshCw, ZoomIn, RotateCw, WandSparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
+import { removeBackground } from '@/ai/flows/remove-background-flow';
 
 interface ImageEditorProps {
   baseImageSrc: string;
 }
 
 export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
+  const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [position, setPosition] = useState({ x: 50, y: 50 });
   const [isDragging, setIsDragging] = useState(false);
@@ -22,6 +24,8 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
   const [imageSize, setImageSize] = useState({ width: 150, height: 150 });
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
+  const [isBackgroundRemoved, setIsBackgroundRemoved] = useState(false);
+  const [isRemovingBackground, setIsRemovingBackground] = useState(false);
 
   const { toast } = useToast();
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -30,19 +34,24 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
 
   const handleReset = () => {
     setUploadedImage(null);
+    setOriginalImage(null);
     setScale(1);
     setRotation(0);
     setPosition({ x: 50, y: 50 });
+    setIsBackgroundRemoved(false);
   };
 
   const handleFile = (file: File) => {
     if (file && file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setUploadedImage(reader.result as string);
+        const result = reader.result as string;
+        setOriginalImage(result);
+        setUploadedImage(result);
         setPosition({ x: 50, y: 50 });
         setScale(1);
         setRotation(0);
+        setIsBackgroundRemoved(false);
       };
       reader.readAsDataURL(file);
     } else {
@@ -145,6 +154,32 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
     }
   };
 
+  const handleBackgroundRemoval = async () => {
+    if (isBackgroundRemoved) {
+      // Revert to the original image
+      setUploadedImage(originalImage);
+      setIsBackgroundRemoved(false);
+    } else {
+      // Trigger AI background removal
+      if (!originalImage) return;
+      setIsRemovingBackground(true);
+      try {
+        const result = await removeBackground({ photoDataUri: originalImage });
+        setUploadedImage(result.imageWithBackgroundRemoved);
+        setIsBackgroundRemoved(true);
+      } catch (error) {
+        console.error("Error removing background:", error);
+        toast({
+          title: "Background Removal Failed",
+          description: "Could not remove background. The uploaded image may not be suitable for this operation.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsRemovingBackground(false);
+      }
+    }
+  };
+
   return (
     <Card className="w-full max-w-4xl mx-auto shadow-lg overflow-hidden">
         <CardContent className="p-4 sm:p-6">
@@ -224,6 +259,14 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
                             </div>
                          </div>
                          <div className="flex sm:flex-col gap-2">
+                            <Button variant="outline" onClick={handleBackgroundRemoval} disabled={isRemovingBackground}>
+                               {isRemovingBackground ? (
+                                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                    <WandSparkles className="mr-2 h-4 w-4" />
+                                )}
+                                {isRemovingBackground ? 'Working...' : (isBackgroundRemoved ? 'Show Background' : 'Remove Background')}
+                            </Button>
                             <Button onClick={saveImage}>
                                 <Download className="mr-2 h-4 w-4" />
                                 Save
