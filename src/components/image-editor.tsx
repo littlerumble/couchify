@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
-import { removeBackground } from '@/ai/flows/remove-background-flow';
+import { blendImage } from '@/ai/flows/remove-background-flow';
 
 interface ImageEditorProps {
   baseImageSrc: string;
@@ -18,14 +18,14 @@ interface ImageEditorProps {
 export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [blendedImage, setBlendedImage] = useState<string | null>(null);
   const [position, setPosition] = useState({ x: 50, y: 50 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
   const [imageSize, setImageSize] = useState({ width: 150, height: 150 });
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
-  const [isBackgroundRemoved, setIsBackgroundRemoved] = useState(false);
-  const [isRemovingBackground, setIsRemovingBackground] = useState(false);
+  const [isBlending, setIsBlending] = useState(false);
 
   const { toast } = useToast();
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -35,10 +35,10 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
   const handleReset = () => {
     setUploadedImage(null);
     setOriginalImage(null);
+    setBlendedImage(null);
     setScale(1);
     setRotation(0);
     setPosition({ x: 50, y: 50 });
-    setIsBackgroundRemoved(false);
   };
 
   const handleFile = (file: File) => {
@@ -46,12 +46,9 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
       const reader = new FileReader();
       reader.onloadend = () => {
         const result = reader.result as string;
+        handleReset();
         setOriginalImage(result);
         setUploadedImage(result);
-        setPosition({ x: 50, y: 50 });
-        setScale(1);
-        setRotation(0);
-        setIsBackgroundRemoved(false);
       };
       reader.readAsDataURL(file);
     } else {
@@ -83,8 +80,7 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
   };
 
   const onMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
-    if (!imageRef.current || !canvasRef.current) return;
-    // Check if the mousedown is on the draggable image's wrapper
+    if (!imageRef.current || !canvasRef.current || blendedImage) return;
     const target = e.target as HTMLElement;
     if (!target.closest('.draggable-wrapper')) return;
 
@@ -154,36 +150,39 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
     }
   };
 
-  const handleBackgroundRemoval = async () => {
-    if (isBackgroundRemoved) {
-      // Revert to the original image
-      setUploadedImage(originalImage);
-      setIsBackgroundRemoved(false);
-    } else {
-      // Trigger AI background removal
-      if (!originalImage) return;
-      setIsRemovingBackground(true);
-      try {
-        const result = await removeBackground({ photoDataUri: originalImage });
-        setUploadedImage(result.imageWithBackgroundRemoved);
-        setIsBackgroundRemoved(true);
-      } catch (error) {
-        console.error("Error removing background:", error);
+  const handleBlend = async () => {
+    if (!canvasRef.current) return;
+
+    setIsBlending(true);
+    try {
+        const canvas = await html2canvas(canvasRef.current, {
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: null,
+        });
+        const compositeImageUri = canvas.toDataURL('image/png');
+        
+        const result = await blendImage({ photoDataUri: compositeImageUri });
+
+        setBlendedImage(result.blendedImage);
+        setUploadedImage(null);
+
+    } catch (error) {
+        console.error("Error blending image:", error);
         toast({
-          title: "Background Removal Failed",
-          description: "Could not remove background. The uploaded image may not be suitable for this operation.",
+          title: "Blending Failed",
+          description: "Could not blend the image. Please try again.",
           variant: "destructive",
         });
-      } finally {
-        setIsRemovingBackground(false);
-      }
+    } finally {
+        setIsBlending(false);
     }
   };
 
   return (
     <Card className="w-full max-w-4xl mx-auto shadow-lg overflow-hidden">
         <CardContent className="p-4 sm:p-6">
-            {!uploadedImage ? (
+            {!originalImage ? (
                 <div 
                     onDrop={handleDrop} 
                     onDragOver={handleDragOver}
@@ -200,13 +199,13 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
                     <div 
                         ref={canvasRef}
                         className="relative w-full aspect-video bg-cover bg-center bg-no-repeat overflow-hidden rounded-lg"
-                        style={{ backgroundImage: `url(${baseImageSrc})` }}
+                        style={{ backgroundImage: `url(${blendedImage || baseImageSrc})` }}
                         onMouseMove={onMouseMove}
                         onMouseUp={onMouseUpOrLeave}
                         onMouseLeave={onMouseUpOrLeave}
                         onMouseDown={onMouseDown}
                     >
-                        {uploadedImage && (
+                        {uploadedImage && !blendedImage && (
                             <div
                                 className="absolute cursor-move select-none draggable-wrapper"
                                 style={{ 
@@ -234,39 +233,43 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
                         )}
                     </div>
                     <div id="image-controls" className="flex flex-col sm:flex-row justify-center items-center gap-6 pt-4">
-                         <div className="w-full sm:w-64 flex flex-col gap-4">
-                            <div className="grid w-full items-center gap-2">
-                                <Label htmlFor="size-slider" className="flex items-center gap-2"><ZoomIn className="h-4 w-4" /> Size</Label>
-                                <Slider
-                                    id="size-slider"
-                                    value={[scale]}
-                                    min={0.1}
-                                    max={3}
-                                    step={0.05}
-                                    onValueChange={(value) => setScale(value[0])}
-                                />
-                            </div>
-                            <div className="grid w-full items-center gap-2">
-                                <Label htmlFor="tilt-slider" className="flex items-center gap-2"><RotateCw className="h-4 w-4" /> Tilt</Label>
-                                <Slider
-                                    id="tilt-slider"
-                                    value={[rotation]}
-                                    min={-180}
-                                    max={180}
-                                    step={1}
-                                    onValueChange={(value) => setRotation(value[0])}
-                                />
-                            </div>
-                         </div>
+                         {!blendedImage && (
+                           <div className="w-full sm:w-64 flex flex-col gap-4">
+                              <div className="grid w-full items-center gap-2">
+                                  <Label htmlFor="size-slider" className="flex items-center gap-2"><ZoomIn className="h-4 w-4" /> Size</Label>
+                                  <Slider
+                                      id="size-slider"
+                                      value={[scale]}
+                                      min={0.1}
+                                      max={3}
+                                      step={0.05}
+                                      onValueChange={(value) => setScale(value[0])}
+                                  />
+                              </div>
+                              <div className="grid w-full items-center gap-2">
+                                  <Label htmlFor="tilt-slider" className="flex items-center gap-2"><RotateCw className="h-4 w-4" /> Tilt</Label>
+                                  <Slider
+                                      id="tilt-slider"
+                                      value={[rotation]}
+                                      min={-180}
+                                      max={180}
+                                      step={1}
+                                      onValueChange={(value) => setRotation(value[0])}
+                                  />
+                              </div>
+                           </div>
+                         )}
                          <div className="flex sm:flex-col gap-2">
-                            <Button variant="outline" onClick={handleBackgroundRemoval} disabled={isRemovingBackground}>
-                               {isRemovingBackground ? (
-                                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                    <WandSparkles className="mr-2 h-4 w-4" />
-                                )}
-                                {isRemovingBackground ? 'Working...' : (isBackgroundRemoved ? 'Show Background' : 'Remove Background')}
-                            </Button>
+                            {!blendedImage && (
+                              <Button variant="outline" onClick={handleBlend} disabled={isBlending}>
+                                 {isBlending ? (
+                                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                  ) : (
+                                      <WandSparkles className="mr-2 h-4 w-4" />
+                                  )}
+                                  {isBlending ? 'Blending...' : 'Blend it!'}
+                              </Button>
+                            )}
                             <Button onClick={saveImage}>
                                 <Download className="mr-2 h-4 w-4" />
                                 Save

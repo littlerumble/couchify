@@ -1,49 +1,49 @@
 'use server';
 /**
- * @fileOverview An AI flow for removing the background from an image.
+ * @fileOverview An AI flow for blending a subject into a background image.
  *
- * - removeBackground - A function that takes an image and returns a version with a transparent background.
- * - RemoveBackgroundInput - The input type for the removeBackground function.
- * - RemoveBackgroundOutput - The return type for the removeBackground function.
+ * - blendImage - A function that takes a composite image and blends the subject into the background.
+ * - BlendImageInput - The input type for the blendImage function.
+ * - BlendImageOutput - The return type for the blendImage function.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-const RemoveBackgroundInputSchema = z.object({
+const BlendImageInputSchema = z.object({
   photoDataUri: z
     .string()
     .describe(
-      "A photo of a subject, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
+      "A composite photo with a subject placed on a background, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
     ),
 });
-export type RemoveBackgroundInput = z.infer<typeof RemoveBackgroundInputSchema>;
+export type BlendImageInput = z.infer<typeof BlendImageInputSchema>;
 
-const RemoveBackgroundOutputSchema = z.object({
-  imageWithBackgroundRemoved: z
+const BlendImageOutputSchema = z.object({
+  blendedImage: z
     .string()
-    .describe('The image with the background removed, as a data URI.'),
+    .describe('The blended image, as a data URI.'),
 });
-export type RemoveBackgroundOutput = z.infer<typeof RemoveBackgroundOutputSchema>;
+export type BlendImageOutput = z.infer<typeof BlendImageOutputSchema>;
 
-export async function removeBackground(
-  input: RemoveBackgroundInput
-): Promise<RemoveBackgroundOutput> {
-  return removeBackgroundFlow(input);
+export async function blendImage(
+  input: BlendImageInput
+): Promise<BlendImageOutput> {
+  return blendImageFlow(input);
 }
 
-const removeBackgroundFlow = ai.defineFlow(
+const blendImageFlow = ai.defineFlow(
   {
-    name: 'removeBackgroundFlow',
-    inputSchema: RemoveBackgroundInputSchema,
-    outputSchema: RemoveBackgroundOutputSchema,
+    name: 'blendImageFlow',
+    inputSchema: BlendImageInputSchema,
+    outputSchema: BlendImageOutputSchema,
   },
   async (input) => {
     const {media} = await ai.generate({
       model: 'googleai/gemini-2.0-flash-preview-image-generation',
       prompt: [
         {media: {url: input.photoDataUri}},
-        {text: 'Remove everything from this image apart from the main person or object in focus. The background must be fully transparent. Return the result as a PNG file.'},
+        {text: 'Blend the image added inside the couch. Without changing the scene or the couch, just blend the image / person / item near / on the couch to match the background.'},
       ],
       config: {
         responseModalities: ['TEXT', 'IMAGE'],
@@ -69,9 +69,9 @@ const removeBackgroundFlow = ai.defineFlow(
     });
 
     if (!media?.url) {
-      throw new Error('Image generation failed to remove background.');
+      throw new Error('Image generation failed to blend the image.');
     }
 
-    return {imageWithBackgroundRemoved: media.url};
+    return {blendedImage: media.url};
   }
 );
