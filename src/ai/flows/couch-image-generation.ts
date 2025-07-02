@@ -10,8 +10,6 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import fs from 'fs';
-import path from 'path';
 
 const CouchImageGenerationInputSchema = z.object({
   photoDataUri: z
@@ -45,19 +43,15 @@ const couchImageGenerationFlow = ai.defineFlow(
       throw new Error('Invalid data URI: could not determine content type for user image.');
     }
     
-    // Read the base image from the file system
-    const baseImagePath = path.join(process.cwd(), 'src', 'ai', '5989857315257436567.jpg');
-    const imageBuffer = fs.readFileSync(baseImagePath);
-    const base64Image = imageBuffer.toString('base64');
-    const baseImageDataUri = `data:image/jpeg;base64,${base64Image}`;
-    const baseImageContentType = 'image/jpeg';
+    // Using a placeholder for the base couch image as the original file seems to be missing.
+    const baseImageUrl = 'https://placehold.co/800x600.png';
 
     const {media} = await ai.generate({
       model: 'googleai/gemini-2.0-flash-preview-image-generation',
       prompt: [
-        {media: {url: baseImageDataUri, contentType: baseImageContentType}},
+        {media: {url: baseImageUrl}},
         {media: {url: input.photoDataUri, contentType: userImageContentType}},
-        {text: 'You are an expert photo editor. The first image is the background. The second image contains the subject. Your task is to perfectly composite the subject from the second image onto the couch in the first image. The subject should appear to be sitting on the couch. It is critical that you DO NOT change the background image (the first image) at all.'},
+        {text: 'You are an expert photo editor. The first image is the background which contains a couch. The second image contains the subject. Your task is to perfectly composite the subject from the second image onto the couch in the first image. The subject should appear to be sitting on the couch. It is critical that you DO NOT change the background image (the first image) at all.'},
       ],
       config: {
         responseModalities: ['TEXT', 'IMAGE'],
