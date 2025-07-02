@@ -9,7 +9,8 @@ import { useToast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
-import { blendImage } from '@/ai/flows/remove-background-flow';
+import { Textarea } from '@/components/ui/textarea';
+import { imageMagic } from '@/ai/flows/remove-background-flow';
 
 interface ImageEditorProps {
   baseImageSrc: string;
@@ -18,14 +19,15 @@ interface ImageEditorProps {
 export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
-  const [blendedImage, setBlendedImage] = useState<string | null>(null);
+  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [position, setPosition] = useState({ x: 50, y: 50 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
   const [imageSize, setImageSize] = useState({ width: 150, height: 150 });
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
-  const [isBlending, setIsBlending] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [prompt, setPrompt] = useState('');
 
   const { toast } = useToast();
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -35,10 +37,11 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
   const handleReset = () => {
     setUploadedImage(null);
     setOriginalImage(null);
-    setBlendedImage(null);
+    setGeneratedImage(null);
     setScale(1);
     setRotation(0);
     setPosition({ x: 50, y: 50 });
+    setPrompt('');
   };
 
   const handleFile = (file: File) => {
@@ -80,7 +83,7 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
   };
 
   const onMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
-    if (!imageRef.current || !canvasRef.current || blendedImage) return;
+    if (!imageRef.current || !canvasRef.current || generatedImage) return;
     const target = e.target as HTMLElement;
     if (!target.closest('.draggable-wrapper')) return;
 
@@ -150,10 +153,10 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
     }
   };
 
-  const handleBlend = async () => {
-    if (!canvasRef.current) return;
+  const handleMagic = async () => {
+    if (!canvasRef.current || !prompt) return;
 
-    setIsBlending(true);
+    setIsGenerating(true);
     try {
         const canvas = await html2canvas(canvasRef.current, {
             useCORS: true,
@@ -162,20 +165,20 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
         });
         const compositeImageUri = canvas.toDataURL('image/png');
         
-        const result = await blendImage({ photoDataUri: compositeImageUri });
+        const result = await imageMagic({ photoDataUri: compositeImageUri, prompt });
 
-        setBlendedImage(result.blendedImage);
+        setGeneratedImage(result.generatedImage);
         setUploadedImage(null);
 
     } catch (error) {
-        console.error("Error blending image:", error);
+        console.error("Error with AI Magic:", error);
         toast({
-          title: "Blending Failed",
-          description: "Could not blend the image. Please try again.",
+          title: "AI Magic Failed",
+          description: "Something went wrong. The AI might have rejected the request due to safety restrictions.",
           variant: "destructive",
         });
     } finally {
-        setIsBlending(false);
+        setIsGenerating(false);
     }
   };
 
@@ -199,13 +202,13 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
                     <div 
                         ref={canvasRef}
                         className="relative w-full aspect-video bg-cover bg-center bg-no-repeat overflow-hidden rounded-lg"
-                        style={{ backgroundImage: `url(${blendedImage || baseImageSrc})` }}
+                        style={{ backgroundImage: `url(${generatedImage || baseImageSrc})` }}
                         onMouseMove={onMouseMove}
                         onMouseUp={onMouseUpOrLeave}
                         onMouseLeave={onMouseUpOrLeave}
                         onMouseDown={onMouseDown}
                     >
-                        {uploadedImage && !blendedImage && (
+                        {uploadedImage && !generatedImage && (
                             <div
                                 className="absolute cursor-move select-none draggable-wrapper"
                                 style={{ 
@@ -232,49 +235,63 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
                             </div>
                         )}
                     </div>
-                    <div id="image-controls" className="flex flex-col sm:flex-row justify-center items-center gap-6 pt-4">
-                         {!blendedImage && (
-                           <div className="w-full sm:w-64 flex flex-col gap-4">
-                              <div className="grid w-full items-center gap-2">
-                                  <Label htmlFor="size-slider" className="flex items-center gap-2"><ZoomIn className="h-4 w-4" /> Size</Label>
-                                  <Slider
-                                      id="size-slider"
-                                      value={[scale]}
-                                      min={0.1}
-                                      max={3}
-                                      step={0.05}
-                                      onValueChange={(value) => setScale(value[0])}
-                                  />
+                    <div id="image-controls" className="flex flex-col items-center gap-6 pt-4">
+                         {!generatedImage && (
+                           <div className="w-full sm:w-[80%] flex flex-col items-center gap-4">
+                              <div className="w-full sm:w-64 flex flex-col gap-4">
+                                  <div className="grid w-full items-center gap-2">
+                                      <Label htmlFor="size-slider" className="flex items-center gap-2"><ZoomIn className="h-4 w-4" /> Size</Label>
+                                      <Slider
+                                          id="size-slider"
+                                          value={[scale]}
+                                          min={0.1}
+                                          max={3}
+                                          step={0.05}
+                                          onValueChange={(value) => setScale(value[0])}
+                                          disabled={isGenerating}
+                                      />
+                                  </div>
+                                  <div className="grid w-full items-center gap-2">
+                                      <Label htmlFor="tilt-slider" className="flex items-center gap-2"><RotateCw className="h-4 w-4" /> Tilt</Label>
+                                      <Slider
+                                          id="tilt-slider"
+                                          value={[rotation]}
+                                          min={-180}
+                                          max={180}
+                                          step={1}
+                                          onValueChange={(value) => setRotation(value[0])}
+                                          disabled={isGenerating}
+                                      />
+                                  </div>
                               </div>
-                              <div className="grid w-full items-center gap-2">
-                                  <Label htmlFor="tilt-slider" className="flex items-center gap-2"><RotateCw className="h-4 w-4" /> Tilt</Label>
-                                  <Slider
-                                      id="tilt-slider"
-                                      value={[rotation]}
-                                      min={-180}
-                                      max={180}
-                                      step={1}
-                                      onValueChange={(value) => setRotation(value[0])}
-                                  />
+                              <div className="w-full space-y-2">
+                                <Label htmlFor="prompt-input">Describe your magic spell</Label>
+                                <Textarea 
+                                  id="prompt-input"
+                                  placeholder="e.g. 'Make the person a pixel art character', 'Turn the scene into a comic book style'"
+                                  value={prompt}
+                                  onChange={(e) => setPrompt(e.target.value)}
+                                  disabled={isGenerating}
+                                />
                               </div>
                            </div>
                          )}
-                         <div className="flex sm:flex-col gap-2">
-                            {!blendedImage && (
-                              <Button variant="outline" onClick={handleBlend} disabled={isBlending}>
-                                 {isBlending ? (
+                         <div className="flex flex-wrap justify-center gap-2">
+                            {!generatedImage && (
+                              <Button onClick={handleMagic} disabled={isGenerating || !prompt}>
+                                 {isGenerating ? (
                                       <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                                   ) : (
                                       <WandSparkles className="mr-2 h-4 w-4" />
                                   )}
-                                  {isBlending ? 'Blending...' : 'Blend it!'}
+                                  {isGenerating ? 'Working Magic...' : 'AI Magic'}
                               </Button>
                             )}
-                            <Button onClick={saveImage}>
+                            <Button onClick={saveImage} disabled={isGenerating}>
                                 <Download className="mr-2 h-4 w-4" />
                                 Save
                             </Button>
-                            <Button variant="outline" onClick={handleReset}>
+                            <Button variant="outline" onClick={handleReset} disabled={isGenerating}>
                                 <RefreshCw className="mr-2 h-4 w-4" />
                                 Start Over
                             </Button>

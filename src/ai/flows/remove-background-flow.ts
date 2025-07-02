@@ -1,50 +1,48 @@
 'use server';
 /**
- * @fileOverview An AI flow for blending a subject into a background image.
+ * @fileOverview An AI flow for transforming an image based on a user prompt.
  *
- * - blendImage - A function that takes a composite image and blends the subject into the background.
- * - BlendImageInput - The input type for the blendImage function.
- * - BlendImageOutput - The return type for the blendImage function.
+ * - imageMagic - A function that takes a composite image and a prompt to generate a new image.
+ * - ImageMagicInput - The input type for the imageMagic function.
+ * - ImageMagicOutput - The return type for the imageMagic function.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-const BlendImageInputSchema = z.object({
+const ImageMagicInputSchema = z.object({
   photoDataUri: z
     .string()
     .describe(
       "A composite photo with a subject placed on a background, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
     ),
-});
-export type BlendImageInput = z.infer<typeof BlendImageInputSchema>;
-
-const BlendImageOutputSchema = z.object({
-  blendedImage: z
+  prompt: z
     .string()
-    .describe('The blended image, as a data URI.'),
+    .describe('The user-provided prompt to guide the image transformation.'),
 });
-export type BlendImageOutput = z.infer<typeof BlendImageOutputSchema>;
+export type ImageMagicInput = z.infer<typeof ImageMagicInputSchema>;
 
-export async function blendImage(
-  input: BlendImageInput
-): Promise<BlendImageOutput> {
-  return blendImageFlow(input);
+const ImageMagicOutputSchema = z.object({
+  generatedImage: z.string().describe('The generated image, as a data URI.'),
+});
+export type ImageMagicOutput = z.infer<typeof ImageMagicOutputSchema>;
+
+export async function imageMagic(
+  input: ImageMagicInput
+): Promise<ImageMagicOutput> {
+  return imageMagicFlow(input);
 }
 
-const blendImageFlow = ai.defineFlow(
+const imageMagicFlow = ai.defineFlow(
   {
-    name: 'blendImageFlow',
-    inputSchema: BlendImageInputSchema,
-    outputSchema: BlendImageOutputSchema,
+    name: 'imageMagicFlow',
+    inputSchema: ImageMagicInputSchema,
+    outputSchema: ImageMagicOutputSchema,
   },
   async (input) => {
     const {media} = await ai.generate({
       model: 'googleai/gemini-2.0-flash-preview-image-generation',
-      prompt: [
-        {media: {url: input.photoDataUri}},
-        {text: 'Blend the image added inside the couch. Without changing the scene or the couch, just blend the image / person / item near / on the couch to match the background.'},
-      ],
+      prompt: [{media: {url: input.photoDataUri}}, {text: input.prompt}],
       config: {
         responseModalities: ['TEXT', 'IMAGE'],
         safetySettings: [
@@ -69,9 +67,9 @@ const blendImageFlow = ai.defineFlow(
     });
 
     if (!media?.url) {
-      throw new Error('Image generation failed to blend the image.');
+      throw new Error('Image generation failed to produce an image.');
     }
 
-    return {blendedImage: media.url};
+    return {generatedImage: media.url};
   }
 );
