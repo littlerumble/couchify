@@ -1,4 +1,6 @@
 'use server';
+import {promises as fs} from 'fs';
+import path from 'path';
 
 /**
  * @fileOverview AI flow to generate an image of the subject of an image sitting on a couch.
@@ -38,18 +40,22 @@ const couchImageGenerationFlow = ai.defineFlow(
     outputSchema: CouchImageGenerationOutputSchema,
   },
   async (input) => {
+    // Correctly determine the user uploaded image's content type
     const userImageContentType = input.photoDataUri.match(/data:([^;]+);base64,/)?.[1];
     if (!userImageContentType) {
       throw new Error('Invalid data URI: could not determine content type for user image.');
     }
-    
-    // Using a placeholder for the base couch image as the original file seems to be missing.
-    const baseImageUrl = 'https://placehold.co/800x600.png';
+
+    // Read the base image from the file system
+    const imagePath = path.join(process.cwd(), 'src', 'ai', '5989857315257436567.jpg');
+    const imageBuffer = await fs.readFile(imagePath);
+    const base64Image = imageBuffer.toString('base64');
+    const baseImageDataUri = `data:image/jpeg;base64,${base64Image}`;
 
     const {media} = await ai.generate({
       model: 'googleai/gemini-2.0-flash-preview-image-generation',
       prompt: [
-        {media: {url: baseImageUrl}},
+        {media: {url: baseImageDataUri, contentType: 'image/jpeg'}},
         {media: {url: input.photoDataUri, contentType: userImageContentType}},
         {text: 'You are an expert photo editor. The first image is the background which contains a couch. The second image contains the subject. Your task is to perfectly composite the subject from the second image onto the couch in the first image. The subject should appear to be sitting on the couch. It is critical that you DO NOT change the background image (the first image) at all.'},
       ],
