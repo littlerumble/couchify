@@ -50,7 +50,7 @@ const couchImageGenerationFlow = ai.defineFlow(
       prompt: [
         {media: {url: baseImageUrl}},
         {media: {url: input.photoDataUri, contentType}},
-        {text: 'Take the subject from the second image and realistically place it sitting on the couch in the first image. The subject should be in the center of the couch. Blend the lighting and style to make it look like a single, cohesive photograph.'},
+        {text: 'Take the subject from the second image and place it sitting on the center of the white couch in the first image. Do not change anything else in the first image. The people and background of the first image must remain exactly the same.'},
       ],
       config: {
         responseModalities: ['TEXT', 'IMAGE'],
