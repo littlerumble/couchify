@@ -40,9 +40,11 @@ const imageMagicFlow = ai.defineFlow(
     outputSchema: ImageMagicOutputSchema,
   },
   async (input) => {
+    const fullPrompt = `You are an expert AI photo editor. Edit the provided image based on the following instruction. Instruction: "${input.prompt}"`;
+
     const {media} = await ai.generate({
       model: 'googleai/gemini-2.0-flash-preview-image-generation',
-      prompt: [{media: {url: input.photoDataUri}}, {text: input.prompt}],
+      prompt: [{media: {url: input.photoDataUri}}, {text: fullPrompt}],
       config: {
         responseModalities: ['TEXT', 'IMAGE'],
         safetySettings: [
