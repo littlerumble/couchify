@@ -11,6 +11,7 @@ import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { imageMagic } from '@/ai/flows/remove-background-flow';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface ImageEditorProps {
   baseImageSrc: string;
@@ -174,7 +175,7 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
         console.error("Error with AI Magic:", error);
         toast({
           title: "AI Magic Failed",
-          description: "Something went wrong. The AI might have rejected the request due to safety restrictions.",
+          description: "The AI was unable to process your request. This could be due to safety restrictions or an issue with the prompt. Please try a different image or prompt.",
           variant: "destructive",
         });
     } finally {
@@ -264,28 +265,53 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
                                       />
                                   </div>
                               </div>
-                              <div className="w-full space-y-2">
-                                <Label htmlFor="prompt-input">Describe your magic spell</Label>
-                                <Textarea 
-                                  id="prompt-input"
-                                  placeholder="e.g. 'Make the person a pixel art character', 'Turn the scene into a comic book style'"
-                                  value={prompt}
-                                  onChange={(e) => setPrompt(e.target.value)}
-                                  disabled={isGenerating}
-                                />
-                              </div>
                            </div>
                          )}
                          <div className="flex flex-wrap justify-center gap-2">
                             {!generatedImage && (
-                              <Button onClick={handleMagic} disabled={isGenerating || !prompt}>
-                                 {isGenerating ? (
-                                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                                  ) : (
-                                      <WandSparkles className="mr-2 h-4 w-4" />
-                                  )}
-                                  {isGenerating ? 'Working Magic...' : 'AI Magic'}
-                              </Button>
+                                <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" disabled={isGenerating}>
+                                        <WandSparkles className="mr-2 h-4 w-4" />
+                                        AI Edit
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-80">
+                                    <form onSubmit={(e) => { e.preventDefault(); handleMagic(); }}>
+                                        <div className="grid gap-4">
+                                            <div className="space-y-2">
+                                                <h4 className="font-medium leading-none">AI Magic</h4>
+                                                <p className="text-sm text-muted-foreground">
+                                                    Describe the change you want the AI to make.
+                                                </p>
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <Label htmlFor="prompt-input">Your Prompt</Label>
+                                                <Textarea
+                                                    id="prompt-input"
+                                                    placeholder="e.g. 'turn the scene into a comic book style'"
+                                                    value={prompt}
+                                                    onChange={(e) => setPrompt(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                       if (e.key === 'Enter' && !e.shiftKey) {
+                                                           e.preventDefault();
+                                                           handleMagic();
+                                                       }
+                                                    }}
+                                                />
+                                            </div>
+                                            <Button type="submit" disabled={isGenerating || !prompt}>
+                                                {isGenerating ? (
+                                                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                                ) : (
+                                                   <WandSparkles className="mr-2 h-4 w-4" />
+                                                )}
+                                                Generate
+                                            </Button>
+                                        </div>
+                                    </form>
+                                </PopoverContent>
+                            </Popover>
                             )}
                             <Button onClick={saveImage} disabled={isGenerating}>
                                 <Download className="mr-2 h-4 w-4" />
