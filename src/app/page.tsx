@@ -4,6 +4,15 @@ import path from 'path';
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
 import { ImageEditor } from '@/components/image-editor';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel"
+import { Card, CardContent } from "@/components/ui/card"
+import Image from 'next/image';
 
 async function getBase64Image() {
   const imagePath = path.join(process.cwd(), 'src', 'ai', '5989857315257436567.jpg');
@@ -21,11 +30,19 @@ async function getBase64Image() {
 export default async function Home() {
   const baseImageSrc = await getBase64Image();
 
+  const recentCreations = [
+    { src: 'https://placehold.co/600x400.png', hint: 'couch meme' },
+    { src: 'https://placehold.co/600x400.png', hint: 'funny edit' },
+    { src: 'https://placehold.co/600x400.png', hint: 'surreal art' },
+    { src: 'https://placehold.co/600x400.png', hint: 'photo collage' },
+    { src: 'https://placehold.co/600x400.png', hint: 'abstract scene' },
+  ];
+
   return (
     <div className="flex flex-col min-h-dvh bg-background text-foreground">
       <Header />
       <main className="flex-1">
-        <section id="home" className="relative w-full py-24 md:py-32 text-center overflow-hidden">
+        <section id="home" className="relative w-full py-12 md:py-24 text-center overflow-hidden">
            <div className="absolute inset-0 bg-primary/10 -z-10"></div>
            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-primary/20 rounded-full blur-3xl -z-10"></div>
            <div className="absolute top-1/4 right-1/4 w-72 h-72 bg-accent/20 rounded-full blur-3xl -z-10"></div>
@@ -43,6 +60,49 @@ export default async function Home() {
               <ImageEditor baseImageSrc={baseImageSrc} />
             </div>
           </div>
+        </section>
+
+        <section id="creations" className="w-full pb-12 md:pb-24">
+            <div className="container px-4 md:px-6">
+                <div className="max-w-5xl mx-auto space-y-6 text-center">
+                    <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">
+                        Recent Creations
+                    </h2>
+                    <p className="text-muted-foreground md:text-lg">
+                        See what the community has been creating on the couch.
+                    </p>
+                    <Carousel
+                        opts={{
+                            align: "start",
+                            loop: true,
+                        }}
+                        className="w-full"
+                    >
+                        <CarouselContent>
+                            {recentCreations.map((creation, index) => (
+                                <CarouselItem key={index} className="md:basis-1/2 lg:basis-1/3">
+                                    <div className="p-1">
+                                        <Card>
+                                            <CardContent className="flex aspect-video items-center justify-center p-0 overflow-hidden rounded-lg">
+                                                <Image 
+                                                    src={creation.src} 
+                                                    alt={`Creation ${index + 1}`} 
+                                                    width={600} 
+                                                    height={400}
+                                                    className="w-full h-full object-cover"
+                                                    data-ai-hint={creation.hint}
+                                                />
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+                                </CarouselItem>
+                            ))}
+                        </CarouselContent>
+                        <CarouselPrevious />
+                        <CarouselNext />
+                    </Carousel>
+                </div>
+            </div>
         </section>
       </main>
       <Footer />

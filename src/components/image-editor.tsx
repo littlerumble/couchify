@@ -4,9 +4,11 @@ import { useState, useRef, type DragEvent, type MouseEvent as ReactMouseEvent } 
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { UploadCloud, Download } from 'lucide-react';
+import { UploadCloud, Download, RefreshCw, ZoomIn, RotateCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
+import { Slider } from '@/components/ui/slider';
+import { Label } from '@/components/ui/label';
 
 interface ImageEditorProps {
   baseImageSrc: string;
@@ -18,19 +20,29 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
   const [imageSize, setImageSize] = useState({ width: 150, height: 150 });
+  const [scale, setScale] = useState(1);
+  const [rotation, setRotation] = useState(0);
 
   const { toast } = useToast();
   const canvasRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const handleReset = () => {
+    setUploadedImage(null);
+    setScale(1);
+    setRotation(0);
+    setPosition({ x: 50, y: 50 });
+  };
+
   const handleFile = (file: File) => {
     if (file && file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onloadend = () => {
         setUploadedImage(reader.result as string);
-        // Reset position for new image
         setPosition({ x: 50, y: 50 });
+        setScale(1);
+        setRotation(0);
       };
       reader.readAsDataURL(file);
     } else {
@@ -61,14 +73,24 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
     e.stopPropagation();
   };
 
-  const onMouseDown = (e: ReactMouseEvent<HTMLImageElement>) => {
-    if (!imageRef.current) return;
+  const onMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
+    if (!imageRef.current || !canvasRef.current) return;
+    // Check if the mousedown is on the draggable image's wrapper
+    const target = e.target as HTMLElement;
+    if (!target.closest('.draggable-wrapper')) return;
+
     e.preventDefault();
+    e.stopPropagation();
+    
     setIsDragging(true);
-    const imageRect = imageRef.current.getBoundingClientRect();
+    const canvasRect = canvasRef.current.getBoundingClientRect();
+    
+    const clickXInCanvas = e.clientX - canvasRect.left;
+    const clickYInCanvas = e.clientY - canvasRect.top;
+    
     setDragStartOffset({
-      x: e.clientX - imageRect.left,
-      y: e.clientY - imageRect.top,
+      x: clickXInCanvas - position.x,
+      y: clickYInCanvas - position.y,
     });
   };
 
@@ -77,11 +99,14 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
     e.preventDefault();
     const canvasRect = canvasRef.current.getBoundingClientRect();
     
+    const renderedWidth = imageSize.width * scale;
+    const renderedHeight = imageSize.height * scale;
+    
     let newX = e.clientX - canvasRect.left - dragStartOffset.x;
     let newY = e.clientY - canvasRect.top - dragStartOffset.y;
     
-    newX = Math.max(0, Math.min(newX, canvasRect.width - imageSize.width));
-    newY = Math.max(0, Math.min(newY, canvasRect.height - imageSize.height));
+    newX = Math.max(0, Math.min(newX, canvasRect.width - renderedWidth));
+    newY = Math.max(0, Math.min(newY, canvasRect.height - renderedHeight));
 
     setPosition({ x: newX, y: newY });
   };
@@ -92,17 +117,14 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
 
   const saveImage = async () => {
     if (!canvasRef.current) return;
-    // Hide buttons during capture
-    const saveButton = document.getElementById('save-button');
-    const newButton = document.getElementById('new-button');
-    if(saveButton) saveButton.style.display = 'none';
-    if(newButton) newButton.style.display = 'none';
+    const controls = document.getElementById('image-controls');
+    if (controls) controls.style.visibility = 'hidden';
 
     try {
       const canvas = await html2canvas(canvasRef.current, {
           useCORS: true,
           allowTaint: true,
-          backgroundColor: null, // Make background transparent if needed
+          backgroundColor: null,
       });
       const image = canvas.toDataURL('image/png', 1.0);
       const link = document.createElement('a');
@@ -119,9 +141,7 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
             variant: 'destructive'
         });
     } finally {
-        // Show buttons again
-        if(saveButton) saveButton.style.display = 'inline-flex';
-        if(newButton) newButton.style.display = 'inline-flex';
+        if (controls) controls.style.visibility = 'visible';
     }
   };
 
@@ -149,39 +169,70 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
                         onMouseMove={onMouseMove}
                         onMouseUp={onMouseUpOrLeave}
                         onMouseLeave={onMouseUpOrLeave}
+                        onMouseDown={onMouseDown}
                     >
                         {uploadedImage && (
-                            <Image
-                                ref={imageRef}
-                                src={uploadedImage}
-                                alt="Draggable subject"
-                                width={0}
-                                height={0}
-                                onMouseDown={onMouseDown}
-                                onDragStart={(e) => e.preventDefault()}
-                                className="absolute cursor-move select-none"
+                            <div
+                                className="absolute cursor-move select-none draggable-wrapper"
                                 style={{ 
                                   top: `${position.y}px`, 
                                   left: `${position.x}px`,
-                                  width: `${imageSize.width}px`,
-                                  height: `${imageSize.height}px`,
+                                  width: `${imageSize.width * scale}px`,
+                                  height: `${imageSize.height * scale}px`,
+                                  transform: `rotate(${rotation}deg)`,
                                 }}
-                                onLoadingComplete={(img) => {
-                                    const aspectRatio = img.naturalWidth / img.naturalHeight;
-                                    const newWidth = 150;
-                                    setImageSize({ width: newWidth, height: newWidth / aspectRatio });
-                                }}
-                            />
+                            >
+                                <Image
+                                    ref={imageRef}
+                                    src={uploadedImage}
+                                    alt="Draggable subject"
+                                    fill
+                                    onDragStart={(e) => e.preventDefault()}
+                                    className="pointer-events-none"
+                                    onLoadingComplete={(img) => {
+                                        const aspectRatio = img.naturalWidth / img.naturalHeight;
+                                        const newWidth = 150;
+                                        setImageSize({ width: newWidth, height: newWidth / aspectRatio });
+                                    }}
+                                />
+                            </div>
                         )}
                     </div>
-                    <div className="flex justify-center gap-4">
-                        <Button id="save-button" onClick={saveImage}>
-                            <Download className="mr-2 h-4 w-4" />
-                            Save Composition
-                        </Button>
-                        <Button id="new-button" variant="outline" onClick={() => setUploadedImage(null)}>
-                            Upload New Image
-                        </Button>
+                    <div id="image-controls" className="flex flex-col sm:flex-row justify-center items-center gap-6 pt-4">
+                         <div className="w-full sm:w-64 flex flex-col gap-4">
+                            <div className="grid w-full items-center gap-2">
+                                <Label htmlFor="size-slider" className="flex items-center gap-2"><ZoomIn className="h-4 w-4" /> Size</Label>
+                                <Slider
+                                    id="size-slider"
+                                    value={[scale]}
+                                    min={0.1}
+                                    max={3}
+                                    step={0.05}
+                                    onValueChange={(value) => setScale(value[0])}
+                                />
+                            </div>
+                            <div className="grid w-full items-center gap-2">
+                                <Label htmlFor="tilt-slider" className="flex items-center gap-2"><RotateCw className="h-4 w-4" /> Tilt</Label>
+                                <Slider
+                                    id="tilt-slider"
+                                    value={[rotation]}
+                                    min={-180}
+                                    max={180}
+                                    step={1}
+                                    onValueChange={(value) => setRotation(value[0])}
+                                />
+                            </div>
+                         </div>
+                         <div className="flex sm:flex-col gap-2">
+                            <Button onClick={saveImage}>
+                                <Download className="mr-2 h-4 w-4" />
+                                Save
+                            </Button>
+                            <Button variant="outline" onClick={handleReset}>
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                                Start Over
+                            </Button>
+                         </div>
                     </div>
                 </div>
             )}
