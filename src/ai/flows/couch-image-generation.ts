@@ -42,15 +42,36 @@ const couchImageGenerationFlow = ai.defineFlow(
     if (!contentType) {
       throw new Error('Invalid data URI: could not determine content type.');
     }
+    
+    const baseImageUrl = 'https://i.imgflip.com/1o012l.jpg';
 
     const {media} = await ai.generate({
       model: 'googleai/gemini-2.0-flash-preview-image-generation',
       prompt: [
+        {media: {url: baseImageUrl}},
         {media: {url: input.photoDataUri, contentType}},
-        {text: 'Convincingly render the subject of this image sitting on a couch.'},
+        {text: 'Take the subject from the second image and realistically place it sitting on the couch in the first image. The subject should be in the center of the couch. Blend the lighting and style to make it look like a single, cohesive photograph.'},
       ],
       config: {
         responseModalities: ['TEXT', 'IMAGE'],
+        safetySettings: [
+            {
+                category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+                threshold: 'BLOCK_NONE',
+            },
+            {
+                category: 'HARM_CATEGORY_HATE_SPEECH',
+                threshold: 'BLOCK_NONE',
+            },
+            {
+                category: 'HARM_CATEGORY_HARASSMENT',
+                threshold: 'BLOCK_NONE',
+            },
+            {
+                category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+                threshold: 'BLOCK_NONE',
+            },
+        ]
       },
     });
 
