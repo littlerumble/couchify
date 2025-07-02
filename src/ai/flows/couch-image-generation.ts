@@ -31,28 +31,33 @@ export async function couchImageGeneration(input: CouchImageGenerationInput): Pr
   return couchImageGenerationFlow(input);
 }
 
-const couchImageGenerationPrompt = ai.definePrompt({
-  name: 'couchImageGenerationPrompt',
-  input: {schema: CouchImageGenerationInputSchema},
-  output: {schema: CouchImageGenerationOutputSchema},
-  prompt: [
-    {media: {url: '{{{photoDataUri}}}'}},
-    {text: 'Convincingly render the subject of this image sitting on a couch.'},
-  ],
-  model: 'googleai/gemini-2.0-flash-preview-image-generation',
-  config: {
-    responseModalities: ['TEXT', 'IMAGE'],
-  },
-});
-
 const couchImageGenerationFlow = ai.defineFlow(
   {
     name: 'couchImageGenerationFlow',
     inputSchema: CouchImageGenerationInputSchema,
     outputSchema: CouchImageGenerationOutputSchema,
   },
-  async input => {
-    const {media} = await couchImageGenerationPrompt(input);
-    return {generatedCouchImage: media!.url!};
+  async (input) => {
+    const contentType = input.photoDataUri.match(/data:([^;]+);base64,/)?.[1];
+    if (!contentType) {
+      throw new Error('Invalid data URI: could not determine content type.');
+    }
+
+    const {media} = await ai.generate({
+      model: 'googleai/gemini-2.0-flash-preview-image-generation',
+      prompt: [
+        {media: {url: input.photoDataUri, contentType}},
+        {text: 'Convincingly render the subject of this image sitting on a couch.'},
+      ],
+      config: {
+        responseModalities: ['TEXT', 'IMAGE'],
+      },
+    });
+
+    if (!media?.url) {
+      throw new Error('Image generation failed to produce an image.');
+    }
+    
+    return {generatedCouchImage: media.url};
   }
 );
