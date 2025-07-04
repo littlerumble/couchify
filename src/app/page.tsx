@@ -119,7 +119,7 @@ async function getRecentCreations() {
 
 async function getLogoSrc() {
     const logoPath = path.join(process.cwd(), 'src', 'ai', '5989857315257436567.jpg');
-    return getImageAsDataUri(logoPath, 'https://placehold.co/24x24.png');
+    return getImageAsDataUri(logoPath, 'https://placehold.co/32x32.png');
 }
 
 export default async function Home() {
