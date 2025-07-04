@@ -7,7 +7,7 @@ import path from 'path';
 
 export const metadata: Metadata = {
   title: '$COUCH on Solana',
-  description: 'Put your vibes on the Couch 🛋️ — Create your own couch memes and scenes!',
+  description: 'Create memes for $COUCH by uploading any image.',
 };
 
 async function getFaviconDataUri(): Promise<string> {
