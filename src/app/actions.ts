@@ -35,24 +35,29 @@ export async function saveCreationToServer(imageDataUri: string) {
 
 export async function removeBackground(imageDataUri: string): Promise<{ success: boolean; image?: string; error?: string }> {
   try {
-    const fetchResponse = await fetch(imageDataUri);
-    const imageBlob = await fetchResponse.blob();
+    const matches = imageDataUri.match(/^data:(image\/(png|jpeg|gif));base64,(.+)$/);
+    if (!matches || matches.length !== 4) {
+      throw new Error('Invalid image data URI format for background removal.');
+    }
+    
+    const mimeType = matches[1];
+    const base64Data = matches[3];
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+    
+    const imageBlob = new Blob([imageBuffer], { type: mimeType });
     const fileName = 'user-image.png';
 
     const formData = new FormData();
     
-    // This multipart form structure is based on the user's provided snippet.
-    // It sends file metadata as a JSON blob and the image data as a separate part.
     const metadata = { path: fileName, meta: { _type: 'gradio.FileData' } };
     formData.append(
-        'data',
-        new Blob([JSON.stringify(metadata)], { type: 'application/json' })
+      'data',
+      new Blob([JSON.stringify(metadata)], { type: 'application/json' })
     );
-    formData.append('file', imageBlob, fileName);
+    formData.append('file', imageBlob as any, fileName);
     
     const API_URL_BASE = 'https://not-lain-background-removal.hf.space/gradio_api';
     
-    // First request: POST to get an event_id
     const eventRes = await fetch(`${API_URL_BASE}/call/png`, {
       method: 'POST',
       body: formData,
@@ -70,7 +75,6 @@ export async function removeBackground(imageDataUri: string): Promise<{ success:
       throw new Error('API did not return an event_id.');
     }
     
-    // Second request: GET the result using the event_id.
     const resultRes = await fetch(`${API_URL_BASE}/call/png/${event_id}`);
 
     if (!resultRes.ok) {
@@ -90,16 +94,15 @@ export async function removeBackground(imageDataUri: string): Promise<{ success:
 
     const finalImageUrl = `https://not-lain-background-removal.hf.space/file=${filePath}`;
     
-    // The editor component expects a data URI, so we fetch the final image and convert it.
     const imageResponse = await fetch(finalImageUrl);
     if (!imageResponse.ok) {
       throw new Error(`Failed to download processed image from: ${finalImageUrl}`);
     }
-    const imageBuffer = await imageResponse.arrayBuffer();
-    const base64Image = Buffer.from(imageBuffer).toString('base64');
-    const mimeType = imageResponse.headers.get('content-type') || 'image/png';
+    const finalImageBuffer = await imageResponse.arrayBuffer();
+    const finalBase64Image = Buffer.from(finalImageBuffer).toString('base64');
+    const finalMimeType = imageResponse.headers.get('content-type') || 'image/png';
     
-    return { success: true, image: `data:${mimeType};base64,${base64Image}` };
+    return { success: true, image: `data:${finalMimeType};base64,${finalBase64Image}` };
 
   } catch (error: any) {
     console.error('Failed to remove background:', error);
