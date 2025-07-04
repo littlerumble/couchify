@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useRef, type DragEvent, type MouseEvent as ReactMouseEvent, useMemo, useEffect } from 'react';
@@ -418,7 +419,10 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                             <Button 
                                 variant="outline" 
                                 size="icon" 
-                                className="absolute left-2 top-1/2 -translate-y-1/2 z-30 opacity-0 group-hover/canvas:opacity-100 transition-opacity"
+                                className={cn(
+                                    "absolute left-2 top-1/2 -translate-y-1/2 z-30 opacity-0 group-hover/canvas:opacity-100 transition-opacity",
+                                    isSaving && "hidden"
+                                )}
                                 onClick={handlePrevBg}
                                 disabled={isSaving}
                             >
@@ -427,7 +431,10 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                             <Button 
                                 variant="outline" 
                                 size="icon" 
-                                className="absolute right-2 top-1/2 -translate-y-1/2 z-30 opacity-0 group-hover/canvas:opacity-100 transition-opacity"
+                                className={cn(
+                                    "absolute right-2 top-1/2 -translate-y-1/2 z-30 opacity-0 group-hover/canvas:opacity-100 transition-opacity",
+                                    isSaving && "hidden"
+                                )}
                                 onClick={handleNextBg}
                                 disabled={isSaving}
                             >
