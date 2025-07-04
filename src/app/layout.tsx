@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
   title: '$COUCH on Solana',
-  description: 'Put your vibes on the Couch 🛋️ — Powered by AI & $COUCH',
+  description: 'Put your vibes on the Couch 🛋️ — Create your own couch memes and scenes!',
 };
 
 export default function RootLayout({
