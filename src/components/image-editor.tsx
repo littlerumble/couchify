@@ -4,7 +4,7 @@ import { useState, useRef, type DragEvent, type MouseEvent as ReactMouseEvent } 
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { UploadCloud, Download, RefreshCw, ZoomIn, RotateCw, WandSparkles } from 'lucide-react';
+import { UploadCloud, Download, RefreshCw, ZoomIn, RotateCw, WandSparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
 import { Slider } from '@/components/ui/slider';
@@ -16,10 +16,10 @@ import { saveCreationToServer } from '@/app/actions';
 import { useRouter } from 'next/navigation';
 
 interface ImageEditorProps {
-  baseImageSrc: string;
+  backgroundImages: string[];
 }
 
-export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
+export function ImageEditor({ backgroundImages }: ImageEditorProps) {
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
@@ -32,6 +32,7 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [prompt, setPrompt] = useState('');
+  const [currentBgIndex, setCurrentBgIndex] = useState(0);
 
   const { toast } = useToast();
   const router = useRouter();
@@ -47,6 +48,7 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
     setRotation(0);
     setPosition({ x: 50, y: 50 });
     setPrompt('');
+    setCurrentBgIndex(0);
   };
 
   const handleFile = (file: File) => {
@@ -202,6 +204,20 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
     }
   };
 
+  const handlePrevBg = () => {
+    setCurrentBgIndex((prevIndex) =>
+      prevIndex === 0 ? backgroundImages.length - 1 : prevIndex - 1
+    );
+    setGeneratedImage(null);
+  };
+
+  const handleNextBg = () => {
+    setCurrentBgIndex((prevIndex) =>
+      prevIndex === backgroundImages.length - 1 ? 0 : prevIndex + 1
+    );
+    setGeneratedImage(null);
+  };
+
   return (
     <Card className="w-full max-w-4xl mx-auto shadow-lg overflow-hidden">
         <CardContent className="p-4 sm:p-6">
@@ -221,13 +237,35 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
                 <div className="space-y-4">
                     <div 
                         ref={canvasRef}
-                        className="relative w-full aspect-video bg-cover bg-center bg-no-repeat overflow-hidden rounded-lg"
-                        style={{ backgroundImage: `url(${generatedImage || baseImageSrc})` }}
+                        className="relative w-full aspect-video bg-cover bg-center bg-no-repeat overflow-hidden rounded-lg group/canvas"
+                        style={{ backgroundImage: `url(${generatedImage || backgroundImages[currentBgIndex]})` }}
                         onMouseMove={onMouseMove}
                         onMouseUp={onMouseUpOrLeave}
                         onMouseLeave={onMouseUpOrLeave}
                         onMouseDown={onMouseDown}
                     >
+                        {backgroundImages.length > 1 && !generatedImage && (
+                            <>
+                                <Button 
+                                    variant="outline" 
+                                    size="icon" 
+                                    className="absolute left-2 top-1/2 -translate-y-1/2 z-10 opacity-0 group-hover/canvas:opacity-100 transition-opacity"
+                                    onClick={handlePrevBg}
+                                    disabled={isGenerating || isSaving}
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                    variant="outline" 
+                                    size="icon" 
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 z-10 opacity-0 group-hover/canvas:opacity-100 transition-opacity"
+                                    onClick={handleNextBg}
+                                    disabled={isGenerating || isSaving}
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            </>
+                        )}
                         {uploadedImage && !generatedImage && (
                             <div
                                 className="absolute cursor-move select-none draggable-wrapper"

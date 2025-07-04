@@ -16,16 +16,51 @@ import Image from 'next/image';
 
 export const dynamic = 'force-dynamic';
 
-async function getBase64Image() {
-  const imagePath = path.join(process.cwd(), 'src', 'ai', '5989857315257436567.jpg');
+async function getBackgroundImages() {
+  const couchImagesPath = '/home/user/studio/couch_images';
+  const defaultImage = 'https://placehold.co/1280x720.png';
+
   try {
-    const imageBuffer = await fs.readFile(imagePath);
-    const base64Image = imageBuffer.toString('base64');
-    return `data:image/jpeg;base64,${base64Image}`;
+    await fs.mkdir(couchImagesPath, { recursive: true });
+    
+    const imageFiles = await fs.readdir(couchImagesPath);
+    
+    const imageFilesSorted = imageFiles
+      .filter(file => /\.(jpg|jpeg|png)$/i.test(file))
+      .sort((a, b) => {
+        if (a === 'couch-1.jpg') return -1;
+        if (b === 'couch-1.jpg') return 1;
+        return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+      });
+
+    if (imageFilesSorted.length === 0) {
+      throw new Error('No background images found in couch_images directory.');
+    }
+    
+    const backgroundUris = await Promise.all(
+      imageFilesSorted.map(async (file) => {
+        const imagePath = path.join(couchImagesPath, file);
+        const imageBuffer = await fs.readFile(imagePath);
+        const base64Image = imageBuffer.toString('base64');
+        const mimeType = file.endsWith('.png') ? 'image/png' : 'image/jpeg';
+        return `data:${mimeType};base64,${base64Image}`;
+      })
+    );
+
+    return backgroundUris;
+
   } catch (error) {
-    console.error("Failed to read base image:", error);
-    // Fallback to a placeholder if the image can't be read
-    return 'https://placehold.co/1280x720.png';
+    console.error("Failed to read background images, falling back to default:", error);
+    // Fallback to the original couch image if the directory is missing or empty
+    const defaultCouchPath = path.join(process.cwd(), 'src', 'ai', '5989857315257436567.jpg');
+    try {
+      const imageBuffer = await fs.readFile(defaultCouchPath);
+      const base64Image = imageBuffer.toString('base64');
+      return [`data:image/jpeg;base64,${base64Image}`];
+    } catch (readError) {
+      console.error("Failed to read fallback base image:", readError);
+      return [defaultImage];
+    }
   }
 }
 
@@ -78,7 +113,7 @@ async function getRecentCreations() {
 }
 
 export default async function Home() {
-  const baseImageSrc = await getBase64Image();
+  const backgroundImages = await getBackgroundImages();
   const recentCreations = await getRecentCreations();
 
   return (
@@ -100,7 +135,7 @@ export default async function Home() {
                 Upload an image, drag it into position, and save your masterpiece.
               </p>
               
-              <ImageEditor baseImageSrc={baseImageSrc} />
+              <ImageEditor backgroundImages={backgroundImages} />
             </div>
           </div>
         </section>
