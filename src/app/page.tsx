@@ -1,3 +1,4 @@
+
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -128,7 +129,7 @@ export default async function Home() {
   const logoSrc = await getLogoSrc();
 
   return (
-    <div className="flex flex-col min-h-dvh bg-background text-foreground">
+    <div className="flex flex-col min-h-dvh bg-background text-foreground overflow-x-hidden">
       <Header logoSrc={logoSrc} />
       <main className="flex-1">
         <section id="home" className="relative w-full py-12 md:py-24 text-center overflow-hidden">

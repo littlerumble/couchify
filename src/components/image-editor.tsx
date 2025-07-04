@@ -432,7 +432,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
             <div className="space-y-4">
                 <div 
                     ref={canvasRef}
-                    className="relative w-full aspect-video bg-cover bg-center bg-no-repeat overflow-hidden rounded-lg group/canvas"
+                    className="relative w-full aspect-video bg-cover bg-center bg-no-repeat overflow-hidden rounded-lg group/canvas touch-none"
                     style={{ backgroundImage: `url(${backgroundImages[currentBgIndex]})` }}
                     onMouseMove={onMouseMove}
                     onMouseUp={onMouseUpOrLeave}
