@@ -14,6 +14,8 @@ import {
 import { Card, CardContent } from "@/components/ui/card"
 import Image from 'next/image';
 
+export const dynamic = 'force-dynamic';
+
 async function getBase64Image() {
   const imagePath = path.join(process.cwd(), 'src', 'ai', '5989857315257436567.jpg');
   try {
