@@ -34,40 +34,72 @@ export async function saveCreationToServer(imageDataUri: string) {
 }
 
 export async function removeBackground(imageDataUri: string): Promise<{ success: boolean; image?: string; error?: string }> {
-  const API_URL = "https://not-lain-background-removal.hf.space/run/predict";
-  
   try {
-    // Convert data URI to a Blob, which is necessary for file uploads in FormData
     const fetchResponse = await fetch(imageDataUri);
     const imageBlob = await fetchResponse.blob();
+    const fileName = 'user-image.png';
 
-    // Create FormData and append the image blob and function index
     const formData = new FormData();
-    // The filename 'image.png' is arbitrary but helps the server identify the file type
-    formData.append('data', imageBlob, 'image.png');
-    formData.append('fn_index', '0');
-
-    // Make the POST request to the Gradio API
-    const response = await fetch(API_URL, {
-        method: 'POST',
-        body: formData,
+    
+    // This multipart form structure is based on the user's provided snippet.
+    // It sends file metadata as a JSON blob and the image data as a separate part.
+    const metadata = { path: fileName, meta: { _type: 'gradio.FileData' } };
+    formData.append(
+        'data',
+        new Blob([JSON.stringify(metadata)], { type: 'application/json' })
+    );
+    formData.append('file', imageBlob, fileName);
+    
+    const API_URL_BASE = 'https://not-lain-background-removal.hf.space/gradio_api';
+    
+    // First request: POST to get an event_id
+    const eventRes = await fetch(`${API_URL_BASE}/call/png`, {
+      method: 'POST',
+      body: formData,
     });
 
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Background removal API returned an error: ${response.status} - ${errorText}`);
+    if (!eventRes.ok) {
+      const errorText = await eventRes.text();
+      throw new Error(`API (event) returned an error: ${eventRes.status} - ${errorText}`);
     }
 
-    const json = await response.json();
-    const processedImage = json.data?.[0];
+    const eventJson = await eventRes.json();
+    const event_id = eventJson.event_id;
 
-    // Check if the response is a valid image data URI
-    if (processedImage && processedImage.startsWith('data:image')) {
-        return { success: true, image: processedImage };
-    } else {
-        console.error('Unexpected format from background removal API:', processedImage);
-        throw new Error('Received an unexpected image format from the API.');
+    if (!event_id) {
+      throw new Error('API did not return an event_id.');
     }
+    
+    // Second request: GET the result using the event_id.
+    const resultRes = await fetch(`${API_URL_BASE}/call/png/${event_id}`);
+
+    if (!resultRes.ok) {
+      const errorText = await resultRes.text();
+      throw new Error(`API (result) returned an error: ${resultRes.status} - ${errorText}`);
+    }
+
+    const resultJson = await resultRes.json();
+    if (resultJson.error) {
+      throw new Error(`API processing error: ${resultJson.error}`);
+    }
+
+    const filePath = resultJson.data?.[0]?.path;
+    if (!filePath) {
+      throw new Error('API response did not contain a valid image path.');
+    }
+
+    const finalImageUrl = `https://not-lain-background-removal.hf.space/file=${filePath}`;
+    
+    // The editor component expects a data URI, so we fetch the final image and convert it.
+    const imageResponse = await fetch(finalImageUrl);
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to download processed image from: ${finalImageUrl}`);
+    }
+    const imageBuffer = await imageResponse.arrayBuffer();
+    const base64Image = Buffer.from(imageBuffer).toString('base64');
+    const mimeType = imageResponse.headers.get('content-type') || 'image/png';
+    
+    return { success: true, image: `data:${mimeType};base64,${base64Image}` };
 
   } catch (error: any) {
     console.error('Failed to remove background:', error);
