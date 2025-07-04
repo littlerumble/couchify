@@ -356,9 +356,10 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                             style={{ 
                               top: `${layer.position.y}px`, 
                               left: `${layer.position.x}px`,
-                              width: `${layer.width * layer.scale}px`,
-                              height: `${layer.height * layer.scale}px`,
-                              transform: `rotate(${layer.rotation}deg)`,
+                              width: `${layer.width}px`,
+                              height: `${layer.height}px`,
+                              transform: `rotate(${layer.rotation}deg) scale(${layer.scale})`,
+                              transformOrigin: 'top left',
                               zIndex: index + 1
                             }}
                             onMouseDown={(e) => onLayerMouseDown(e, layer.id)}
