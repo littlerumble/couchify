@@ -407,7 +407,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
   if (!editorStarted) {
     return (
       <Card className="w-full max-w-4xl mx-auto shadow-lg overflow-hidden">
-        <CardContent className="p-4 sm:p-6">
+        <CardContent className="p-2 sm:p-6">
           <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleInputChange} multiple={false} />
           <div 
             className="relative w-full aspect-video border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-center text-muted-foreground cursor-pointer hover:border-primary hover:bg-accent transition-colors"
@@ -426,7 +426,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
 
   return (
     <Card className="w-full max-w-4xl mx-auto shadow-lg overflow-hidden">
-        <CardContent className="p-4 sm:p-6">
+        <CardContent className="p-2 sm:p-6">
             <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleInputChange} multiple={false} />
             <div className="space-y-4">
                 <div 

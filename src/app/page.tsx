@@ -137,7 +137,7 @@ export default async function Home() {
            <div className="absolute top-1/4 right-1/4 w-72 h-72 bg-accent/20 rounded-full blur-3xl -z-10"></div>
            <div className="absolute bottom-1/4 left-1/4 w-72 h-72 bg-accent/20 rounded-full blur-3xl -z-10"></div>
           
-          <div className="container px-4 md:px-6">
+          <div className="container px-2 sm:px-4 md:px-6">
             <div className="max-w-4xl mx-auto space-y-6">
               <h1 className="font-headline text-4xl font-bold tracking-tighter sm:text-5xl md:text-6xl lg:text-7xl">
                 Create Your Couch Scene
