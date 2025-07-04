@@ -46,6 +46,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [currentBgIndex, setCurrentBgIndex] = useState(0);
+  const [editorStarted, setEditorStarted] = useState(false);
 
   const { toast } = useToast();
   const router = useRouter();
@@ -89,6 +90,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
   const handleReset = (soft = false) => {
     if (!soft) {
         setCurrentBgIndex(0);
+        setEditorStarted(false);
     }
     setLayers([]);
     setActiveLayerId(null);
@@ -120,6 +122,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
           };
           setLayers(prev => [...prev, newLayer]);
           setActiveLayerId(newLayer.id);
+          setEditorStarted(true);
         }
       };
       reader.readAsDataURL(file);
@@ -294,6 +297,26 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
     { name: 'Bling', component: BlingIcon, width: 60, height: 60 },
     { name: 'Crown', component: CrownIcon, width: 70, height: 50 },
   ];
+  
+  if (!editorStarted) {
+    return (
+      <Card className="w-full max-w-4xl mx-auto shadow-lg overflow-hidden">
+        <CardContent className="p-4 sm:p-6">
+          <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleInputChange} multiple={false} />
+          <div 
+            className="relative w-full aspect-video border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-center text-muted-foreground cursor-pointer hover:border-primary hover:bg-accent transition-colors"
+            onClick={() => fileInputRef.current?.click()}
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+          >
+            <UploadCloud className="h-12 w-12 mb-4" />
+            <p className="font-semibold text-lg">Drag & Drop an image here</p>
+            <p className="text-sm">or click to upload a file</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="w-full max-w-4xl mx-auto shadow-lg overflow-hidden">
@@ -311,12 +334,6 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                     onDrop={handleDrop}
                     onDragOver={handleDragOver}
                 >
-                    {layers.length === 0 && !generatedImage && (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-muted-foreground pointer-events-none p-4">
-                            <UploadCloud className="h-12 w-12 mb-4" />
-                            <p>Drag & Drop an image here, or click "Add Image" below</p>
-                        </div>
-                    )}
                     {backgroundImages.length > 1 && !generatedImage && (
                         <>
                             <Button 
