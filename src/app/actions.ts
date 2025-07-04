@@ -4,7 +4,6 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { revalidatePath } from 'next/cache';
-import { imageMagic } from '@/ai/flows/remove-background-flow';
 
 export async function saveCreationToServer(imageDataUri: string) {
   try {

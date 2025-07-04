@@ -4,13 +4,11 @@ import { useState, useRef, type DragEvent, type MouseEvent as ReactMouseEvent, u
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { UploadCloud, Download, RefreshCw, ZoomIn, RotateCw, WandSparkles, ChevronLeft, ChevronRight, Text, Smile, Move, X, ImageOff } from 'lucide-react';
+import { UploadCloud, Download, RefreshCw, ZoomIn, RotateCw, ChevronLeft, ChevronRight, Text, Smile, Move, X, ImageOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { imageMagic } from '@/ai/flows/remove-background-flow';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { saveCreationToServer, removeBackground } from '@/app/actions';
 import { useRouter } from 'next/navigation';
@@ -37,15 +35,12 @@ interface ImageEditorProps {
 export function ImageEditor({ backgroundImages }: ImageEditorProps) {
   const [layers, setLayers] = useState<Layer[]>([]);
   const [activeLayerId, setActiveLayerId] = useState<string | null>(null);
-  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   
   const [isInteracting, setIsInteracting] = useState(false);
   const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
   
-  const [isGenerating, setIsGenerating] = useState(false);
   const [isRemovingBg, setIsRemovingBg] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [prompt, setPrompt] = useState('');
   const [currentBgIndex, setCurrentBgIndex] = useState(0);
   const [editorStarted, setEditorStarted] = useState(false);
 
@@ -95,8 +90,6 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
     }
     setLayers([]);
     setActiveLayerId(null);
-    setGeneratedImage(null);
-    setPrompt('');
   };
 
   const handleFile = (file: File) => {
@@ -158,8 +151,6 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
 
   const onLayerMouseDown = (e: ReactMouseEvent<HTMLDivElement>, layerId: string) => {
     e.stopPropagation();
-    
-    if (generatedImage) return;
 
     setActiveLayerId(layerId);
     setIsInteracting(true);
@@ -244,39 +235,6 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
         setIsSaving(false);
     }
   };
-
-  const handleMagic = async () => {
-    if (!canvasRef.current || !prompt) return;
-
-    setActiveLayerId(null);
-    setIsGenerating(true);
-
-    await new Promise(resolve => setTimeout(resolve, 100)); // Allow state to update
-
-    try {
-        const canvas = await html2canvas(canvasRef.current, {
-            useCORS: true,
-            allowTaint: true,
-            backgroundColor: null,
-        });
-        const compositeImageUri = canvas.toDataURL('image/png');
-        
-        const result = await imageMagic({ photoDataUri: compositeImageUri, prompt });
-
-        setGeneratedImage(result.generatedImage);
-        setLayers([]);
-
-    } catch (error) {
-        console.error("Error with AI Magic:", error);
-        toast({
-          title: "AI Magic Failed",
-          description: "The AI was unable to process your request. This could be due to safety restrictions or an issue with the prompt. Please try a different image or prompt.",
-          variant: "destructive",
-        });
-    } finally {
-        setIsGenerating(false);
-    }
-  };
   
   const handleRemoveBackground = async () => {
     if (!activeLayer || activeLayer.type !== 'image') return;
@@ -353,7 +311,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                 <div 
                     ref={canvasRef}
                     className="relative w-full aspect-video bg-cover bg-center bg-no-repeat overflow-hidden rounded-lg group/canvas"
-                    style={{ backgroundImage: `url(${generatedImage || backgroundImages[currentBgIndex]})` }}
+                    style={{ backgroundImage: `url(${backgroundImages[currentBgIndex]})` }}
                     onMouseMove={onMouseMove}
                     onMouseUp={onMouseUpOrLeave}
                     onMouseLeave={onMouseUpOrLeave}
@@ -361,14 +319,14 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                     onDrop={handleDrop}
                     onDragOver={handleDragOver}
                 >
-                    {backgroundImages.length > 1 && !generatedImage && (
+                    {backgroundImages.length > 1 && (
                         <>
                             <Button 
                                 variant="outline" 
                                 size="icon" 
                                 className="absolute left-2 top-1/2 -translate-y-1/2 z-20 opacity-0 group-hover/canvas:opacity-100 transition-opacity"
                                 onClick={handlePrevBg}
-                                disabled={isGenerating || isSaving}
+                                disabled={isSaving}
                             >
                                 <ChevronLeft className="h-4 w-4" />
                             </Button>
@@ -377,13 +335,13 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                                 size="icon" 
                                 className="absolute right-2 top-1/2 -translate-y-1/2 z-20 opacity-0 group-hover/canvas:opacity-100 transition-opacity"
                                 onClick={handleNextBg}
-                                disabled={isGenerating || isSaving}
+                                disabled={isSaving}
                             >
                                 <ChevronRight className="h-4 w-4" />
                             </Button>
                         </>
                     )}
-                    {!generatedImage && layers.map((layer, index) => (
+                    {layers.map((layer, index) => (
                          <div
                             key={layer.id}
                             className={cn(
@@ -401,7 +359,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                             }}
                             onMouseDown={(e) => onLayerMouseDown(e, layer.id)}
                         >
-                            {activeLayerId === layer.id && !generatedImage && (
+                            {activeLayerId === layer.id && (
                               <>
                                 <div
                                   title="Move"
@@ -445,7 +403,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                     ))}
                 </div>
                 <div id="image-controls" className="flex flex-col items-center gap-6 pt-4">
-                     {activeLayer && !generatedImage && (
+                     {activeLayer && (
                        <div className="w-full sm:w-[80%] flex flex-col items-center gap-4">
                           <div className="w-full sm:w-64 flex flex-col gap-4">
                               <div className="grid w-full items-center gap-2">
@@ -457,7 +415,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                                       max={5}
                                       step={0.05}
                                       onValueChange={(value) => updateLayer(activeLayer.id, { scale: value[0] })}
-                                      disabled={isGenerating || isSaving}
+                                      disabled={isSaving}
                                   />
                               </div>
                               <div className="grid w-full items-center gap-2">
@@ -469,99 +427,52 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                                       max={180}
                                       step={1}
                                       onValueChange={(value) => updateLayer(activeLayer.id, { rotation: value[0] })}
-                                      disabled={isGenerating || isSaving}
+                                      disabled={isSaving}
                                   />
                               </div>
                           </div>
                        </div>
                      )}
                      <div className="flex flex-wrap justify-center gap-2">
-                        {!generatedImage && (
-                            <>
-                            <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isGenerating || isSaving}>
-                                <UploadCloud className="mr-2 h-4 w-4" />
-                                Add Image
-                            </Button>
-                            <Button variant="outline" onClick={() => addLayer('text', 'Edit Me', { width: 150, height: 40 })} disabled={isGenerating || isSaving}>
-                                <Text className="mr-2 h-4 w-4" />
-                                Add Text
-                            </Button>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button variant="outline" disabled={isGenerating || isSaving}>
-                                        <Smile className="mr-2 h-4 w-4" />
-                                        Add Sticker
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-48">
-                                    <div className="grid grid-cols-3 gap-2">
-                                        {stickers.map(sticker => (
-                                            <Button key={sticker.name} variant="ghost" className="h-auto p-2 flex flex-col gap-1" onClick={() => addLayer('sticker', sticker.component, { width: sticker.width, height: sticker.height })}>
-                                                <sticker.component className="w-10 h-10" />
-                                                <span className="text-xs">{sticker.name}</span>
-                                            </Button>
-                                        ))}
-                                    </div>
-                                </PopoverContent>
-                            </Popover>
-                             {activeLayer && activeLayer.type === 'image' && !generatedImage && (
-                                <Button variant="outline" onClick={handleRemoveBackground} disabled={isRemovingBg || isGenerating || isSaving}>
-                                    {isRemovingBg ? (
-                                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                                    ) : (
-                                        <ImageOff className="mr-2 h-4 w-4" />
-                                    )}
-                                    Remove BG
+                        <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isSaving}>
+                            <UploadCloud className="mr-2 h-4 w-4" />
+                            Add Image
+                        </Button>
+                        <Button variant="outline" onClick={() => addLayer('text', 'Edit Me', { width: 150, height: 40 })} disabled={isSaving}>
+                            <Text className="mr-2 h-4 w-4" />
+                            Add Text
+                        </Button>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" disabled={isSaving}>
+                                    <Smile className="mr-2 h-4 w-4" />
+                                    Add Sticker
                                 </Button>
-                            )}
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button variant="outline" disabled={isGenerating || isSaving}>
-                                        <WandSparkles className="mr-2 h-4 w-4" />
-                                        AI Edit
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-80">
-                                    <form onSubmit={(e) => { e.preventDefault(); handleMagic(); }}>
-                                        <div className="grid gap-4">
-                                            <div className="space-y-2">
-                                                <h4 className="font-medium leading-none">AI Magic</h4>
-                                                <p className="text-sm text-muted-foreground">
-                                                    Describe the change you want the AI to make.
-                                                </p>
-                                            </div>
-                                            <div className="grid gap-2">
-                                                <Label htmlFor="prompt-input">Your Prompt</Label>
-                                                <Textarea
-                                                    id="prompt-input"
-                                                    placeholder="e.g. 'turn the scene into a comic book style'"
-                                                    value={prompt}
-                                                    onChange={(e) => setPrompt(e.target.value)}
-                                                    onKeyDown={(e) => {
-                                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                                        e.preventDefault();
-                                                        handleMagic();
-                                                    }
-                                                    }}
-                                                />
-                                            </div>
-                                            <Button type="submit" disabled={isGenerating || !prompt}>
-                                                {isGenerating ? (
-                                                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                                                ) : (
-                                                <WandSparkles className="mr-2 h-4 w-4" />
-                                                )}
-                                                Generate
-                                            </Button>
-                                        </div>
-                                    </form>
-                                </PopoverContent>
-                            </Popover>
-                            </>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-48">
+                                <div className="grid grid-cols-3 gap-2">
+                                    {stickers.map(sticker => (
+                                        <Button key={sticker.name} variant="ghost" className="h-auto p-2 flex flex-col gap-1" onClick={() => addLayer('sticker', sticker.component, { width: sticker.width, height: sticker.height })}>
+                                            <sticker.component className="w-10 h-10" />
+                                            <span className="text-xs">{sticker.name}</span>
+                                        </Button>
+                                    ))}
+                                </div>
+                            </PopoverContent>
+                        </Popover>
+                         {activeLayer && activeLayer.type === 'image' && (
+                            <Button variant="outline" onClick={handleRemoveBackground} disabled={isRemovingBg || isSaving}>
+                                {isRemovingBg ? (
+                                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                    <ImageOff className="mr-2 h-4 w-4" />
+                                )}
+                                Remove BG
+                            </Button>
                         )}
                      </div>
                      <div className="flex flex-wrap justify-center gap-2 pt-4 border-t w-full">
-                        <Button onClick={saveImage} disabled={isGenerating || isSaving || layers.length === 0 && !generatedImage}>
+                        <Button onClick={saveImage} disabled={isSaving || layers.length === 0}>
                             {isSaving ? (
                                 <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                             ) : (
@@ -569,7 +480,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                             )}
                             Save
                         </Button>
-                        <Button variant="outline" onClick={() => handleReset(false)} disabled={isGenerating || isSaving}>
+                        <Button variant="outline" onClick={() => handleReset(false)} disabled={isSaving}>
                             <RefreshCw className="mr-2 h-4 w-4" />
                             Start Over
                         </Button>
