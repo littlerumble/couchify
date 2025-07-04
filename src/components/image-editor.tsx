@@ -4,7 +4,7 @@ import { useState, useRef, type DragEvent, type MouseEvent as ReactMouseEvent, u
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { UploadCloud, Download, RefreshCw, ZoomIn, RotateCw, WandSparkles, ChevronLeft, ChevronRight, Text, Smile, Move, X } from 'lucide-react';
+import { UploadCloud, Download, RefreshCw, ZoomIn, RotateCw, WandSparkles, ChevronLeft, ChevronRight, Text, Smile, Move, X, ImageOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
 import { Slider } from '@/components/ui/slider';
@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { imageMagic } from '@/ai/flows/remove-background-flow';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { saveCreationToServer } from '@/app/actions';
+import { saveCreationToServer, removeBackground } from '@/app/actions';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
 import { BlingIcon, CigarIcon, CrownIcon, DealWithItGlassesIcon, MustacheIcon, TopHatIcon } from '@/components/icons';
@@ -43,6 +43,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
   const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
   
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isRemovingBg, setIsRemovingBg] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [currentBgIndex, setCurrentBgIndex] = useState(0);
@@ -276,6 +277,32 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
         setIsGenerating(false);
     }
   };
+  
+  const handleRemoveBackground = async () => {
+    if (!activeLayer || activeLayer.type !== 'image') return;
+
+    setIsRemovingBg(true);
+    try {
+        const result = await removeBackground(activeLayer.content);
+        if (result.success && result.image) {
+            updateLayer(activeLayer.id, { content: result.image });
+            toast({
+                title: 'Success',
+                description: 'Background removed.',
+            });
+        } else {
+            throw new Error(result.error || 'Failed to remove background.');
+        }
+    } catch (error: any) {
+        toast({
+            title: 'Background Removal Failed',
+            description: error.message,
+            variant: 'destructive',
+        });
+    } finally {
+        setIsRemovingBg(false);
+    }
+  };
 
   const handlePrevBg = () => {
     setCurrentBgIndex((prevIndex) =>
@@ -477,7 +504,16 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                                     </div>
                                 </PopoverContent>
                             </Popover>
-
+                             {activeLayer && activeLayer.type === 'image' && !generatedImage && (
+                                <Button variant="outline" onClick={handleRemoveBackground} disabled={isRemovingBg || isGenerating || isSaving}>
+                                    {isRemovingBg ? (
+                                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <ImageOff className="mr-2 h-4 w-4" />
+                                    )}
+                                    Remove BG
+                                </Button>
+                            )}
                             <Popover>
                                 <PopoverTrigger asChild>
                                     <Button variant="outline" disabled={isGenerating || isSaving}>

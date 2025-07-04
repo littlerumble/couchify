@@ -31,3 +31,40 @@ export async function saveCreationToServer(imageDataUri: string) {
     return { success: false, error: 'Failed to save image.' };
   }
 }
+
+export async function removeBackground(imageDataUri: string): Promise<{ success: boolean; image?: string; error?: string }> {
+  // This server action calls a public Gradio API to remove the background from an image.
+  // We are using a standard request-response endpoint for reliability in a serverless environment.
+  const API_URL = 'https://not-lain-background-removal.hf.space/run/predict';
+
+  try {
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        // Standard Gradio API payload for file/image inputs
+        data: [imageDataUri],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Background removal API failed with status: ${response.status}. Details: ${errorText}`);
+    }
+
+    const result = await response.json();
+
+    // The result is typically nested in a 'data' array
+    const outputImage = result?.data?.[0];
+
+    if (!outputImage) {
+      throw new Error('API did not return an image.');
+    }
+
+    return { success: true, image: outputImage };
+
+  } catch (error: any) {
+    console.error('Failed to remove background:', error);
+    return { success: false, error: error.message || 'An unknown error occurred.' };
+  }
+}
