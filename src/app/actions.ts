@@ -34,33 +34,33 @@ export async function saveCreationToServer(imageDataUri: string) {
 
 export async function removeBackground(imageDataUri: string): Promise<{ success: boolean; image?: string; error?: string }> {
   // This server action calls a public Gradio API to remove the background from an image.
-  // We are using a standard request-response endpoint for reliability in a serverless environment.
-  const API_URL = 'https://not-lain-background-removal.hf.space/run/predict';
+  // Based on the API docs, the correct blocking endpoint for a web app is /run/image.
+  const API_URL = 'https://not-lain-background-removal.hf.space/run/image';
 
   try {
     const response = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        // Standard Gradio API payload for file/image inputs
-        // Adding fn_index to make the request more explicit for some API versions.
-        fn_index: 0,
+        // The payload for this endpoint is a simple object with a 'data' array.
         data: [imageDataUri],
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
+      // Throw an error with details from the API if the request failed
       throw new Error(`Background removal API failed with status: ${response.status}. Details: ${errorText}`);
     }
 
     const result = await response.json();
 
-    // The result is typically nested in a 'data' array
+    // The result is typically nested in a 'data' array in the response JSON
     const outputImage = result?.data?.[0];
 
     if (!outputImage) {
-      throw new Error('API did not return an image.');
+      // If the response format is unexpected and doesn't contain an image
+      throw new Error('API did not return an image in the expected format.');
     }
 
     return { success: true, image: outputImage };
