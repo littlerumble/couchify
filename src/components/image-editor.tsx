@@ -4,7 +4,7 @@ import { useState, useRef, type DragEvent, type MouseEvent as ReactMouseEvent, u
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { UploadCloud, Download, RefreshCw, ZoomIn, RotateCw, ChevronLeft, ChevronRight, Text, Smile, Move, X, ImageOff } from 'lucide-react';
+import { UploadCloud, Download, RefreshCw, ZoomIn, RotateCw, ChevronLeft, ChevronRight, Text, Smile, Move, X, ImageOff, Palette, Type } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
 import { Slider } from '@/components/ui/slider';
@@ -15,6 +15,8 @@ import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
 import { BlingIcon, CigarIcon, CrownIcon, DealWithItGlassesIcon, MustacheIcon, TopHatIcon } from '@/components/icons';
 import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 interface Layer {
@@ -26,6 +28,8 @@ interface Layer {
     rotation: number;
     width: number;
     height: number;
+    color?: string;
+    fontFamily?: string;
 }
 
 interface ImageEditorProps {
@@ -72,6 +76,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
       rotation: 0,
       width: dimensions.width,
       height: dimensions.height,
+      ...(type === 'text' && { color: '#FFFFFF', fontFamily: 'Impact' })
     };
     setLayers(prev => [...prev, newLayer]);
     setActiveLayerId(newLayer.id);
@@ -390,8 +395,12 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                                     contentEditable
                                     suppressContentEditableWarning
                                     onBlur={(e) => updateLayer(layer.id, { content: e.currentTarget.textContent || '' })}
-                                    className="w-full h-full pointer-events-auto bg-transparent focus:outline-none text-3xl font-bold text-white cursor-text"
-                                    style={{textShadow: '2px 2px 4px rgba(0,0,0,0.7)'}}
+                                    className="w-full h-full pointer-events-auto bg-transparent focus:outline-none text-3xl font-bold cursor-text"
+                                    style={{
+                                        color: layer.color,
+                                        fontFamily: layer.fontFamily,
+                                        textShadow: '2px 2px 4px rgba(0,0,0,0.7)'
+                                    }}
                                 >
                                     {layer.content}
                                 </div>
@@ -407,9 +416,9 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                        <div className="w-full sm:w-[80%] flex flex-col items-center gap-4">
                           <div className="w-full sm:w-64 flex flex-col gap-4">
                               <div className="grid w-full items-center gap-2">
-                                  <Label htmlFor="size-slider" className="flex items-center gap-2"><ZoomIn className="h-4 w-4" /> Size</Label>
+                                  <Label htmlFor="scale-slider" className="flex items-center gap-2"><ZoomIn className="h-4 w-4" /> Scale</Label>
                                   <Slider
-                                      id="size-slider"
+                                      id="scale-slider"
                                       value={[activeLayer.scale]}
                                       min={0.1}
                                       max={5}
@@ -430,6 +439,41 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                                       disabled={isSaving}
                                   />
                               </div>
+                               {activeLayer.type === 'text' && (
+                                <>
+                                    <div className="grid w-full items-center gap-2">
+                                        <Label htmlFor="color-picker" className="flex items-center gap-2"><Palette className="h-4 w-4" /> Color</Label>
+                                        <Input
+                                            id="color-picker"
+                                            type="color"
+                                            value={activeLayer.color || '#ffffff'}
+                                            onChange={(e) => updateLayer(activeLayer.id, { color: e.target.value })}
+                                            className="p-1 h-10 w-full"
+                                            disabled={isSaving}
+                                        />
+                                    </div>
+                                    <div className="grid w-full items-center gap-2">
+                                        <Label htmlFor="font-select" className="flex items-center gap-2"><Type className="h-4 w-4" /> Font</Label>
+                                        <Select
+                                            value={activeLayer.fontFamily}
+                                            onValueChange={(value) => updateLayer(activeLayer.id, { fontFamily: value })}
+                                            disabled={isSaving}
+                                        >
+                                            <SelectTrigger id="font-select">
+                                                <SelectValue placeholder="Select a font" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Impact" style={{fontFamily: 'Impact'}}>Impact</SelectItem>
+                                                <SelectItem value="Anton" style={{fontFamily: 'Anton'}}>Anton</SelectItem>
+                                                <SelectItem value="Bangers" style={{fontFamily: 'Bangers'}}>Bangers</SelectItem>
+                                                <SelectItem value="Lobster" style={{fontFamily: 'Lobster'}}>Lobster</SelectItem>
+                                                <SelectItem value="Arial" style={{fontFamily: 'Arial'}}>Arial</SelectItem>
+                                                <SelectItem value="Comic Sans MS" style={{fontFamily: 'Comic Sans MS'}}>Comic Sans</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </>
+                               )}
                           </div>
                        </div>
                      )}
