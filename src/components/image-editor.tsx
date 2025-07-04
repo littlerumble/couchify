@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useRef, type DragEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import { useState, useRef, type DragEvent, type MouseEvent as ReactMouseEvent, useMemo, useEffect } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { UploadCloud, Download, RefreshCw, ZoomIn, RotateCw, WandSparkles, ChevronLeft, ChevronRight } from 'lucide-react';
+import { UploadCloud, Download, RefreshCw, ZoomIn, RotateCw, WandSparkles, ChevronLeft, ChevronRight, Text, Smile, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
 import { Slider } from '@/components/ui/slider';
@@ -14,21 +14,34 @@ import { imageMagic } from '@/ai/flows/remove-background-flow';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { saveCreationToServer } from '@/app/actions';
 import { useRouter } from 'next/navigation';
+import { v4 as uuidv4 } from 'uuid';
+import { DealWithItGlassesIcon, TopHatIcon } from '@/components/icons';
+import { cn } from '@/lib/utils';
+
+
+interface Layer {
+    id: string;
+    type: 'image' | 'text' | 'sticker';
+    content: any;
+    position: { x: number; y: number };
+    scale: number;
+    rotation: number;
+    width: number;
+    height: number;
+}
 
 interface ImageEditorProps {
   backgroundImages: string[];
 }
 
 export function ImageEditor({ backgroundImages }: ImageEditorProps) {
-  const [originalImage, setOriginalImage] = useState<string | null>(null);
-  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [layers, setLayers] = useState<Layer[]>([]);
+  const [activeLayerId, setActiveLayerId] = useState<string | null>(null);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
-  const [position, setPosition] = useState({ x: 50, y: 50 });
-  const [isDragging, setIsDragging] = useState(false);
+  
+  const [isInteracting, setIsInteracting] = useState(false);
   const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
-  const [imageSize, setImageSize] = useState({ width: 150, height: 150 });
-  const [scale, setScale] = useState(1);
-  const [rotation, setRotation] = useState(0);
+  
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [prompt, setPrompt] = useState('');
@@ -37,18 +50,50 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
   const { toast } = useToast();
   const router = useRouter();
   const canvasRef = useRef<HTMLDivElement>(null);
-  const imageRef = useRef<HTMLImageElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleReset = () => {
-    setUploadedImage(null);
-    setOriginalImage(null);
+  const activeLayer = useMemo(() => {
+    return layers.find(l => l.id === activeLayerId);
+  }, [layers, activeLayerId]);
+
+  useEffect(() => {
+    // Reset layers if background changes, but not on initial load
+    handleReset(true);
+  }, [currentBgIndex]);
+
+  const updateLayer = (id: string, newProps: Partial<Layer>) => {
+    setLayers(prev => prev.map(l => (l.id === id ? { ...l, ...newProps } : l)));
+  };
+
+  const addLayer = (type: 'text' | 'sticker', content: any, dimensions: { width: number; height: number; }) => {
+    const newLayer: Layer = {
+      id: uuidv4(),
+      type,
+      content,
+      position: { x: 50, y: 50 },
+      scale: 1,
+      rotation: 0,
+      width: dimensions.width,
+      height: dimensions.height,
+    };
+    setLayers(prev => [...prev, newLayer]);
+    setActiveLayerId(newLayer.id);
+  };
+
+  const deleteActiveLayer = () => {
+    if (!activeLayerId) return;
+    setLayers(prev => prev.filter(l => l.id !== activeLayerId));
+    setActiveLayerId(null);
+  };
+
+  const handleReset = (soft = false) => {
+    if (!soft) {
+        setCurrentBgIndex(0);
+    }
+    setLayers([]);
+    setActiveLayerId(null);
     setGeneratedImage(null);
-    setScale(1);
-    setRotation(0);
-    setPosition({ x: 50, y: 50 });
     setPrompt('');
-    setCurrentBgIndex(0);
   };
 
   const handleFile = (file: File) => {
@@ -57,8 +102,26 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
       reader.onloadend = () => {
         const result = reader.result as string;
         handleReset();
-        setOriginalImage(result);
-        setUploadedImage(result);
+        const img = document.createElement('img');
+        img.src = result;
+        img.onload = () => {
+          const aspectRatio = img.naturalWidth / img.naturalHeight;
+          const newWidth = 150;
+          const newHeight = newWidth / aspectRatio;
+          
+          const newLayer: Layer = {
+            id: uuidv4(),
+            type: 'image',
+            content: result,
+            position: { x: 50, y: 50 },
+            scale: 1,
+            rotation: 0,
+            width: newWidth,
+            height: newHeight,
+          };
+          setLayers([newLayer]);
+          setActiveLayerId(newLayer.id);
+        }
       };
       reader.readAsDataURL(file);
     } else {
@@ -89,33 +152,40 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
     e.stopPropagation();
   };
 
-  const onMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
-    if (!imageRef.current || !canvasRef.current || generatedImage) return;
-    const target = e.target as HTMLElement;
-    if (!target.closest('.draggable-wrapper')) return;
-
+  const onLayerMouseDown = (e: ReactMouseEvent<HTMLDivElement>, layerId: string) => {
     e.preventDefault();
     e.stopPropagation();
     
-    setIsDragging(true);
-    const canvasRect = canvasRef.current.getBoundingClientRect();
+    if (generatedImage) return;
+
+    setActiveLayerId(layerId);
+    setIsInteracting(true);
     
+    const layer = layers.find(l => l.id === layerId);
+    if (!layer || !canvasRef.current) return;
+
+    const canvasRect = canvasRef.current.getBoundingClientRect();
     const clickXInCanvas = e.clientX - canvasRect.left;
     const clickYInCanvas = e.clientY - canvasRect.top;
     
     setDragStartOffset({
-      x: clickXInCanvas - position.x,
-      y: clickYInCanvas - position.y,
+      x: clickXInCanvas - layer.position.x,
+      y: clickYInCanvas - layer.position.y,
     });
   };
 
+  const onCanvasMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
+      if ((e.target as HTMLElement).closest('.layer-wrapper')) return;
+      setActiveLayerId(null);
+  }
+
   const onMouseMove = (e: ReactMouseEvent<HTMLDivElement>) => {
-    if (!isDragging || !canvasRef.current) return;
+    if (!isInteracting || !activeLayer || !canvasRef.current) return;
     e.preventDefault();
     const canvasRect = canvasRef.current.getBoundingClientRect();
     
-    const renderedWidth = imageSize.width * scale;
-    const renderedHeight = imageSize.height * scale;
+    const renderedWidth = activeLayer.width * activeLayer.scale;
+    const renderedHeight = activeLayer.height * activeLayer.scale;
     
     let newX = e.clientX - canvasRect.left - dragStartOffset.x;
     let newY = e.clientY - canvasRect.top - dragStartOffset.y;
@@ -123,19 +193,20 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
     newX = Math.max(0, Math.min(newX, canvasRect.width - renderedWidth));
     newY = Math.max(0, Math.min(newY, canvasRect.height - renderedHeight));
 
-    setPosition({ x: newX, y: newY });
+    updateLayer(activeLayer.id, { position: { x: newX, y: newY } });
   };
 
   const onMouseUpOrLeave = () => {
-    setIsDragging(false);
+    setIsInteracting(false);
   };
 
   const saveImage = async () => {
     if (!canvasRef.current) return;
     
+    setActiveLayerId(null);
     setIsSaving(true);
-    const controls = document.getElementById('image-controls');
-    if (controls) controls.style.visibility = 'hidden';
+    
+    await new Promise(resolve => setTimeout(resolve, 100)); // Allow state to update
 
     try {
       const canvas = await html2canvas(canvasRef.current, {
@@ -145,13 +216,11 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
       });
       const imageUri = canvas.toDataURL('image/png', 1.0);
       
-      // Save to server
       const result = await saveCreationToServer(imageUri);
       if (!result.success) {
           throw new Error(result.error || 'Server-side save failed');
       }
 
-      // Trigger client-side download
       const link = document.createElement('a');
       link.href = imageUri;
       link.download = 'couch-creation.png';
@@ -159,7 +228,6 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
       link.click();
       document.body.removeChild(link);
 
-      // Refresh page data for carousel
       router.refresh();
 
     } catch (error) {
@@ -170,7 +238,6 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
             variant: 'destructive'
         });
     } finally {
-        if (controls) controls.style.visibility = 'visible';
         setIsSaving(false);
     }
   };
@@ -178,7 +245,11 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
   const handleMagic = async () => {
     if (!canvasRef.current || !prompt) return;
 
+    setActiveLayerId(null);
     setIsGenerating(true);
+
+    await new Promise(resolve => setTimeout(resolve, 100)); // Allow state to update
+
     try {
         const canvas = await html2canvas(canvasRef.current, {
             useCORS: true,
@@ -190,7 +261,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
         const result = await imageMagic({ photoDataUri: compositeImageUri, prompt });
 
         setGeneratedImage(result.generatedImage);
-        setUploadedImage(null);
+        setLayers([]);
 
     } catch (error) {
         console.error("Error with AI Magic:", error);
@@ -208,20 +279,23 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
     setCurrentBgIndex((prevIndex) =>
       prevIndex === 0 ? backgroundImages.length - 1 : prevIndex - 1
     );
-    setGeneratedImage(null);
   };
 
   const handleNextBg = () => {
     setCurrentBgIndex((prevIndex) =>
       prevIndex === backgroundImages.length - 1 ? 0 : prevIndex + 1
     );
-    setGeneratedImage(null);
   };
+
+  const stickers = [
+    { name: 'Glasses', component: DealWithItGlassesIcon, width: 80, height: 30 },
+    { name: 'Top Hat', component: TopHatIcon, width: 80, height: 70 },
+  ];
 
   return (
     <Card className="w-full max-w-4xl mx-auto shadow-lg overflow-hidden">
         <CardContent className="p-4 sm:p-6">
-            {!originalImage ? (
+            {layers.length === 0 && !generatedImage ? (
                 <div 
                     onDrop={handleDrop} 
                     onDragOver={handleDragOver}
@@ -242,14 +316,14 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                         onMouseMove={onMouseMove}
                         onMouseUp={onMouseUpOrLeave}
                         onMouseLeave={onMouseUpOrLeave}
-                        onMouseDown={onMouseDown}
+                        onMouseDown={onCanvasMouseDown}
                     >
                         {backgroundImages.length > 1 && !generatedImage && (
                             <>
                                 <Button 
                                     variant="outline" 
                                     size="icon" 
-                                    className="absolute left-2 top-1/2 -translate-y-1/2 z-10 opacity-0 group-hover/canvas:opacity-100 transition-opacity"
+                                    className="absolute left-2 top-1/2 -translate-y-1/2 z-20 opacity-0 group-hover/canvas:opacity-100 transition-opacity"
                                     onClick={handlePrevBg}
                                     disabled={isGenerating || isSaving}
                                 >
@@ -258,7 +332,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                                 <Button 
                                     variant="outline" 
                                     size="icon" 
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 z-10 opacity-0 group-hover/canvas:opacity-100 transition-opacity"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 z-20 opacity-0 group-hover/canvas:opacity-100 transition-opacity"
                                     onClick={handleNextBg}
                                     disabled={isGenerating || isSaving}
                                 >
@@ -266,46 +340,62 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                                 </Button>
                             </>
                         )}
-                        {uploadedImage && !generatedImage && (
-                            <div
-                                className="absolute cursor-move select-none draggable-wrapper"
+                        {!generatedImage && layers.map((layer) => (
+                             <div
+                                key={layer.id}
+                                className={cn(
+                                    'absolute select-none layer-wrapper',
+                                    {'cursor-move': isInteracting},
+                                    {'ring-2 ring-primary ring-offset-2 ring-offset-background': activeLayerId === layer.id},
+                                )}
                                 style={{ 
-                                  top: `${position.y}px`, 
-                                  left: `${position.x}px`,
-                                  width: `${imageSize.width * scale}px`,
-                                  height: `${imageSize.height * scale}px`,
-                                  transform: `rotate(${rotation}deg)`,
+                                  top: `${layer.position.y}px`, 
+                                  left: `${layer.position.x}px`,
+                                  width: `${layer.width * layer.scale}px`,
+                                  height: `${layer.height * layer.scale}px`,
+                                  transform: `rotate(${layer.rotation}deg)`,
                                 }}
+                                onMouseDown={(e) => onLayerMouseDown(e, layer.id)}
                             >
-                                <Image
-                                    ref={imageRef}
-                                    src={uploadedImage}
-                                    alt="Draggable subject"
-                                    fill
-                                    onDragStart={(e) => e.preventDefault()}
-                                    className="pointer-events-none"
-                                    onLoadingComplete={(img) => {
-                                        const aspectRatio = img.naturalWidth / img.naturalHeight;
-                                        const newWidth = 150;
-                                        setImageSize({ width: newWidth, height: newWidth / aspectRatio });
-                                    }}
-                                />
+                                {layer.type === 'image' && (
+                                    <Image
+                                        src={layer.content}
+                                        alt="User upload"
+                                        fill
+                                        draggable={false}
+                                        className="pointer-events-none"
+                                    />
+                                )}
+                                {layer.type === 'text' && (
+                                    <div
+                                        contentEditable
+                                        suppressContentEditableWarning
+                                        onBlur={(e) => updateLayer(layer.id, { content: e.currentTarget.textContent || '' })}
+                                        className="w-full h-full pointer-events-auto bg-transparent focus:outline-none text-3xl font-bold text-white"
+                                        style={{textShadow: '2px 2px 4px rgba(0,0,0,0.7)'}}
+                                    >
+                                        {layer.content}
+                                    </div>
+                                )}
+                                {layer.type === 'sticker' && (
+                                     <layer.content className="w-full h-full pointer-events-none" />
+                                )}
                             </div>
-                        )}
+                        ))}
                     </div>
                     <div id="image-controls" className="flex flex-col items-center gap-6 pt-4">
-                         {!generatedImage && (
+                         {activeLayer && !generatedImage && (
                            <div className="w-full sm:w-[80%] flex flex-col items-center gap-4">
                               <div className="w-full sm:w-64 flex flex-col gap-4">
                                   <div className="grid w-full items-center gap-2">
                                       <Label htmlFor="size-slider" className="flex items-center gap-2"><ZoomIn className="h-4 w-4" /> Size</Label>
                                       <Slider
                                           id="size-slider"
-                                          value={[scale]}
+                                          value={[activeLayer.scale]}
                                           min={0.1}
-                                          max={3}
+                                          max={5}
                                           step={0.05}
-                                          onValueChange={(value) => setScale(value[0])}
+                                          onValueChange={(value) => updateLayer(activeLayer.id, { scale: value[0] })}
                                           disabled={isGenerating || isSaving}
                                       />
                                   </div>
@@ -313,11 +403,11 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                                       <Label htmlFor="tilt-slider" className="flex items-center gap-2"><RotateCw className="h-4 w-4" /> Tilt</Label>
                                       <Slider
                                           id="tilt-slider"
-                                          value={[rotation]}
+                                          value={[activeLayer.rotation]}
                                           min={-180}
                                           max={180}
                                           step={1}
-                                          onValueChange={(value) => setRotation(value[0])}
+                                          onValueChange={(value) => updateLayer(activeLayer.id, { rotation: value[0] })}
                                           disabled={isGenerating || isSaving}
                                       />
                                   </div>
@@ -326,50 +416,82 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                          )}
                          <div className="flex flex-wrap justify-center gap-2">
                             {!generatedImage && (
+                                <>
+                                <Button variant="outline" onClick={() => addLayer('text', 'Edit Me', { width: 150, height: 40 })} disabled={isGenerating || isSaving}>
+                                    <Text className="mr-2 h-4 w-4" />
+                                    Add Text
+                                </Button>
                                 <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button variant="outline" disabled={isGenerating || isSaving}>
-                                        <WandSparkles className="mr-2 h-4 w-4" />
-                                        AI Edit
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-80">
-                                    <form onSubmit={(e) => { e.preventDefault(); handleMagic(); }}>
-                                        <div className="grid gap-4">
-                                            <div className="space-y-2">
-                                                <h4 className="font-medium leading-none">AI Magic</h4>
-                                                <p className="text-sm text-muted-foreground">
-                                                    Describe the change you want the AI to make.
-                                                </p>
-                                            </div>
-                                            <div className="grid gap-2">
-                                                <Label htmlFor="prompt-input">Your Prompt</Label>
-                                                <Textarea
-                                                    id="prompt-input"
-                                                    placeholder="e.g. 'turn the scene into a comic book style'"
-                                                    value={prompt}
-                                                    onChange={(e) => setPrompt(e.target.value)}
-                                                    onKeyDown={(e) => {
-                                                       if (e.key === 'Enter' && !e.shiftKey) {
-                                                           e.preventDefault();
-                                                           handleMagic();
-                                                       }
-                                                    }}
-                                                />
-                                            </div>
-                                            <Button type="submit" disabled={isGenerating || !prompt}>
-                                                {isGenerating ? (
-                                                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                                                ) : (
-                                                   <WandSparkles className="mr-2 h-4 w-4" />
-                                                )}
-                                                Generate
-                                            </Button>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" disabled={isGenerating || isSaving}>
+                                            <Smile className="mr-2 h-4 w-4" />
+                                            Add Sticker
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-40">
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {stickers.map(sticker => (
+                                                <Button key={sticker.name} variant="ghost" className="h-auto p-2 flex flex-col gap-1" onClick={() => addLayer('sticker', sticker.component, { width: sticker.width, height: sticker.height })}>
+                                                    <sticker.component className="w-10 h-10" />
+                                                    <span className="text-xs">{sticker.name}</span>
+                                                </Button>
+                                            ))}
                                         </div>
-                                    </form>
-                                </PopoverContent>
-                            </Popover>
+                                    </PopoverContent>
+                                </Popover>
+
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" disabled={isGenerating || isSaving}>
+                                            <WandSparkles className="mr-2 h-4 w-4" />
+                                            AI Edit
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-80">
+                                        <form onSubmit={(e) => { e.preventDefault(); handleMagic(); }}>
+                                            <div className="grid gap-4">
+                                                <div className="space-y-2">
+                                                    <h4 className="font-medium leading-none">AI Magic</h4>
+                                                    <p className="text-sm text-muted-foreground">
+                                                        Describe the change you want the AI to make.
+                                                    </p>
+                                                </div>
+                                                <div className="grid gap-2">
+                                                    <Label htmlFor="prompt-input">Your Prompt</Label>
+                                                    <Textarea
+                                                        id="prompt-input"
+                                                        placeholder="e.g. 'turn the scene into a comic book style'"
+                                                        value={prompt}
+                                                        onChange={(e) => setPrompt(e.target.value)}
+                                                        onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                                            e.preventDefault();
+                                                            handleMagic();
+                                                        }
+                                                        }}
+                                                    />
+                                                </div>
+                                                <Button type="submit" disabled={isGenerating || !prompt}>
+                                                    {isGenerating ? (
+                                                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                                    ) : (
+                                                    <WandSparkles className="mr-2 h-4 w-4" />
+                                                    )}
+                                                    Generate
+                                                </Button>
+                                            </div>
+                                        </form>
+                                    </PopoverContent>
+                                </Popover>
+                                </>
                             )}
+                             {activeLayer && !generatedImage && (
+                                <Button variant="destructive" size="icon" onClick={deleteActiveLayer} disabled={isGenerating || isSaving}>
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            )}
+                         </div>
+                         <div className="flex flex-wrap justify-center gap-2 pt-4 border-t w-full">
                             <Button onClick={saveImage} disabled={isGenerating || isSaving}>
                                 {isSaving ? (
                                     <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
@@ -378,7 +500,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                                 )}
                                 Save
                             </Button>
-                            <Button variant="outline" onClick={handleReset} disabled={isGenerating || isSaving}>
+                            <Button variant="outline" onClick={() => handleReset(false)} disabled={isGenerating || isSaving}>
                                 <RefreshCw className="mr-2 h-4 w-4" />
                                 Start Over
                             </Button>

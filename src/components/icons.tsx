@@ -31,3 +31,19 @@ export function XIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+export function DealWithItGlassesIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 64 64" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <path d="M8,24 L8,32 L24,32 L24,24 L8,24 Z M40,24 L40,32 L56,32 L56,24 L40,24 Z M0,24 L8,24 L8,16 L0,16 L0,24 Z M56,24 L64,24 L64,16 L56,16 L56,24 Z M24,32 L32,32 L32,40 L24,40 L24,32 Z M32,32 L40,32 L40,40 L32,40 L32,32 Z"/>
+    </svg>
+  );
+}
+
+export function TopHatIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 64 64" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
+        <path d="M8,48 L56,48 L56,40 L8,40 L8,48 Z M16,40 L48,40 L48,8 L16,8 L16,40 Z" />
+    </svg>
+  );
+}
