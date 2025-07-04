@@ -9,9 +9,6 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import {promises as fs} from 'fs';
-import path from 'path';
-import {v4 as uuidv4} from 'uuid';
 
 const ImageMagicInputSchema = z.object({
   photoDataUri: z
@@ -73,23 +70,6 @@ const imageMagicFlow = ai.defineFlow(
 
     if (!media?.url) {
       throw new Error('Image generation failed to produce an image.');
-    }
-
-    try {
-      const outputDir = '/home/user/studio/gen_images';
-      await fs.mkdir(outputDir, {recursive: true});
-      const dataUri = media.url;
-      const matches = dataUri.match(/^data:(image\/(png|jpeg));base64,(.+)$/);
-      if (matches && matches.length === 4) {
-        const fileExtension = matches[2];
-        const base64Data = matches[3];
-        const imageBuffer = Buffer.from(base64Data, 'base64');
-        const filename = `${uuidv4()}.${fileExtension}`;
-        const outputPath = path.join(outputDir, filename);
-        await fs.writeFile(outputPath, imageBuffer);
-      }
-    } catch (e) {
-      console.error('Failed to save generated image', e);
     }
 
     return {generatedImage: media.url};

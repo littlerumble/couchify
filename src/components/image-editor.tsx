@@ -12,6 +12,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { imageMagic } from '@/ai/flows/remove-background-flow';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { saveCreationToServer } from '@/app/actions';
+import { useRouter } from 'next/navigation';
 
 interface ImageEditorProps {
   baseImageSrc: string;
@@ -28,9 +30,11 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
   const [scale, setScale] = useState(1);
   const [rotation, setRotation] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [prompt, setPrompt] = useState('');
 
   const { toast } = useToast();
+  const router = useRouter();
   const canvasRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -126,6 +130,8 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
 
   const saveImage = async () => {
     if (!canvasRef.current) return;
+    
+    setIsSaving(true);
     const controls = document.getElementById('image-controls');
     if (controls) controls.style.visibility = 'hidden';
 
@@ -135,13 +141,25 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
           allowTaint: true,
           backgroundColor: null,
       });
-      const image = canvas.toDataURL('image/png', 1.0);
+      const imageUri = canvas.toDataURL('image/png', 1.0);
+      
+      // Save to server
+      const result = await saveCreationToServer(imageUri);
+      if (!result.success) {
+          throw new Error(result.error || 'Server-side save failed');
+      }
+
+      // Trigger client-side download
       const link = document.createElement('a');
-      link.href = image;
+      link.href = imageUri;
       link.download = 'couch-creation.png';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+
+      // Refresh page data for carousel
+      router.refresh();
+
     } catch (error) {
         console.error("Error saving image:", error);
         toast({
@@ -151,6 +169,7 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
         });
     } finally {
         if (controls) controls.style.visibility = 'visible';
+        setIsSaving(false);
     }
   };
 
@@ -249,7 +268,7 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
                                           max={3}
                                           step={0.05}
                                           onValueChange={(value) => setScale(value[0])}
-                                          disabled={isGenerating}
+                                          disabled={isGenerating || isSaving}
                                       />
                                   </div>
                                   <div className="grid w-full items-center gap-2">
@@ -261,7 +280,7 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
                                           max={180}
                                           step={1}
                                           onValueChange={(value) => setRotation(value[0])}
-                                          disabled={isGenerating}
+                                          disabled={isGenerating || isSaving}
                                       />
                                   </div>
                               </div>
@@ -271,7 +290,7 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
                             {!generatedImage && (
                                 <Popover>
                                 <PopoverTrigger asChild>
-                                    <Button variant="outline" disabled={isGenerating}>
+                                    <Button variant="outline" disabled={isGenerating || isSaving}>
                                         <WandSparkles className="mr-2 h-4 w-4" />
                                         AI Edit
                                     </Button>
@@ -313,11 +332,15 @@ export function ImageEditor({ baseImageSrc }: ImageEditorProps) {
                                 </PopoverContent>
                             </Popover>
                             )}
-                            <Button onClick={saveImage} disabled={isGenerating}>
-                                <Download className="mr-2 h-4 w-4" />
+                            <Button onClick={saveImage} disabled={isGenerating || isSaving}>
+                                {isSaving ? (
+                                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                    <Download className="mr-2 h-4 w-4" />
+                                )}
                                 Save
                             </Button>
-                            <Button variant="outline" onClick={handleReset} disabled={isGenerating}>
+                            <Button variant="outline" onClick={handleReset} disabled={isGenerating || isSaving}>
                                 <RefreshCw className="mr-2 h-4 w-4" />
                                 Start Over
                             </Button>
