@@ -4,7 +4,7 @@ import { useState, useRef, type DragEvent, type MouseEvent as ReactMouseEvent, u
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { UploadCloud, Download, RefreshCw, ZoomIn, RotateCw, ChevronLeft, ChevronRight, Text, Smile, Move, X, ImageOff, Palette, Type } from 'lucide-react';
+import { UploadCloud, Download, RefreshCw, ZoomIn, RotateCw, ChevronLeft, ChevronRight, Text, Smile, Move, X, ImageOff, Palette, Type, Pen, Paintbrush } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
 import { Slider } from '@/components/ui/slider';
@@ -40,6 +40,11 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
   const [layers, setLayers] = useState<Layer[]>([]);
   const [activeLayerId, setActiveLayerId] = useState<string | null>(null);
   
+  const [tool, setTool] = useState<'move' | 'pen' | 'brush'>('move');
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [brushColor, setBrushColor] = useState('#FFFFFF');
+  const [brushSize, setBrushSize] = useState(5);
+  
   const [isInteracting, setIsInteracting] = useState(false);
   const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
   
@@ -51,16 +56,31 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
   const { toast } = useToast();
   const router = useRouter();
   const canvasRef = useRef<HTMLDivElement>(null);
+  const drawingCanvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeLayer = useMemo(() => {
     return layers.find(l => l.id === activeLayerId);
   }, [layers, activeLayerId]);
-
+  
   useEffect(() => {
-    // Reset layers if background changes, but not on initial load
     handleReset(true);
   }, [currentBgIndex]);
+  
+  useEffect(() => {
+      const canvas = drawingCanvasRef.current;
+      const container = canvasRef.current;
+      if (canvas && container) {
+          canvas.width = container.offsetWidth;
+          canvas.height = container.offsetHeight;
+      }
+  }, [editorStarted]);
+  
+  useEffect(() => {
+    if (tool !== 'move') {
+      setActiveLayerId(null);
+    }
+  }, [tool]);
 
   const updateLayer = (id: string, newProps: Partial<Layer>) => {
     setLayers(prev => prev.map(l => (l.id === id ? { ...l, ...newProps } : l)));
@@ -80,6 +100,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
     };
     setLayers(prev => [...prev, newLayer]);
     setActiveLayerId(newLayer.id);
+    setTool('move');
   };
 
   const deleteActiveLayer = () => {
@@ -95,6 +116,12 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
     }
     setLayers([]);
     setActiveLayerId(null);
+
+    const canvas = drawingCanvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if(canvas && ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
   };
 
   const handleFile = (file: File) => {
@@ -129,6 +156,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
             };
             setLayers(prev => [...prev, newLayer]);
             setActiveLayerId(newLayer.id);
+            setTool('move');
             if (!editorStarted) {
                 setEditorStarted(true);
             }
@@ -166,6 +194,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
   };
 
   const onLayerMouseDown = (e: ReactMouseEvent<HTMLDivElement>, layerId: string) => {
+    if (tool !== 'move') return;
     e.stopPropagation();
 
     setActiveLayerId(layerId);
@@ -185,29 +214,84 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
   };
 
   const onCanvasMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
+    if (tool === 'move') {
       if ((e.target as HTMLElement).closest('.layer-wrapper')) return;
       setActiveLayerId(null);
+    } else {
+      startDrawing(e);
+    }
   }
 
-  const onMouseMove = (e: ReactMouseEvent<HTMLDivElement>) => {
-    if (!isInteracting || !activeLayer || !canvasRef.current) return;
-    e.preventDefault();
-    const canvasRect = canvasRef.current.getBoundingClientRect();
+  const startDrawing = (e: ReactMouseEvent<HTMLDivElement>) => {
+    const canvas = drawingCanvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
     
-    const renderedWidth = activeLayer.width * activeLayer.scale;
-    const renderedHeight = activeLayer.height * activeLayer.scale;
+    setIsDrawing(true);
     
-    let newX = e.clientX - canvasRect.left - dragStartOffset.x;
-    let newY = e.clientY - canvasRect.top - dragStartOffset.y;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
     
-    newX = Math.max(0, Math.min(newX, canvasRect.width - renderedWidth));
-    newY = Math.max(0, Math.min(newY, canvasRect.height - renderedHeight));
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.strokeStyle = brushColor;
+    ctx.lineWidth = tool === 'brush' ? brushSize * 1.5 : brushSize;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+  };
 
-    updateLayer(activeLayer.id, { position: { x: newX, y: newY } });
+  const draw = (e: ReactMouseEvent<HTMLDivElement>) => {
+    if (!isDrawing) return;
+    
+    const canvas = drawingCanvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    const canvas = drawingCanvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    
+    ctx.closePath();
+    setIsDrawing(false);
+  };
+
+  const onMouseMove = (e: ReactMouseEvent<HTMLDivElement>) => {
+    if (tool === 'move') {
+      if (!isInteracting || !activeLayer || !canvasRef.current) return;
+      e.preventDefault();
+      const canvasRect = canvasRef.current.getBoundingClientRect();
+      
+      const renderedWidth = activeLayer.width * activeLayer.scale;
+      const renderedHeight = activeLayer.height * activeLayer.scale;
+      
+      let newX = e.clientX - canvasRect.left - dragStartOffset.x;
+      let newY = e.clientY - canvasRect.top - dragStartOffset.y;
+      
+      newX = Math.max(0, Math.min(newX, canvasRect.width - renderedWidth));
+      newY = Math.max(0, Math.min(newY, canvasRect.height - renderedHeight));
+
+      updateLayer(activeLayer.id, { position: { x: newX, y: newY } });
+    } else {
+      draw(e);
+    }
   };
 
   const onMouseUpOrLeave = () => {
-    setIsInteracting(false);
+    if (tool === 'move') {
+      setIsInteracting(false);
+    } else {
+      stopDrawing();
+    }
   };
 
   const saveImage = async () => {
@@ -322,12 +406,19 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                     onDrop={handleDrop}
                     onDragOver={handleDragOver}
                 >
+                    <canvas
+                        ref={drawingCanvasRef}
+                        className={cn(
+                            'absolute top-0 left-0',
+                            tool !== 'move' ? 'cursor-crosshair z-20' : 'pointer-events-none z-0'
+                        )}
+                    />
                     {backgroundImages.length > 1 && (
                         <>
                             <Button 
                                 variant="outline" 
                                 size="icon" 
-                                className="absolute left-2 top-1/2 -translate-y-1/2 z-20 opacity-0 group-hover/canvas:opacity-100 transition-opacity"
+                                className="absolute left-2 top-1/2 -translate-y-1/2 z-30 opacity-0 group-hover/canvas:opacity-100 transition-opacity"
                                 onClick={handlePrevBg}
                                 disabled={isSaving}
                             >
@@ -336,7 +427,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                             <Button 
                                 variant="outline" 
                                 size="icon" 
-                                className="absolute right-2 top-1/2 -translate-y-1/2 z-20 opacity-0 group-hover/canvas:opacity-100 transition-opacity"
+                                className="absolute right-2 top-1/2 -translate-y-1/2 z-30 opacity-0 group-hover/canvas:opacity-100 transition-opacity"
                                 onClick={handleNextBg}
                                 disabled={isSaving}
                             >
@@ -349,9 +440,10 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                             key={layer.id}
                             className={cn(
                                 'absolute select-none layer-wrapper',
-                                {'cursor-move': isInteracting && activeLayerId === layer.id},
-                                {'ring-2 ring-primary ring-offset-2 ring-offset-background': activeLayerId === layer.id},
-                                {'ring-blue-500': replacingBgLayerId === layer.id}
+                                {'cursor-move': isInteracting && activeLayerId === layer.id && tool === 'move'},
+                                {'ring-2 ring-primary ring-offset-2 ring-offset-background': activeLayerId === layer.id && tool === 'move'},
+                                {'ring-blue-500': replacingBgLayerId === layer.id},
+                                tool !== 'move' && 'pointer-events-none'
                             )}
                             style={{ 
                               top: `${layer.position.y}px`, 
@@ -359,12 +451,12 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                               width: `${layer.width}px`,
                               height: `${layer.height}px`,
                               transform: `rotate(${layer.rotation}deg) scale(${layer.scale})`,
-                              transformOrigin: 'top left',
+                              transformOrigin: 'center center',
                               zIndex: index + 1
                             }}
                             onMouseDown={(e) => onLayerMouseDown(e, layer.id)}
                         >
-                            {activeLayerId === layer.id && (
+                            {activeLayerId === layer.id && tool === 'move' && (
                               <>
                                 <div
                                   title="Move"
@@ -387,7 +479,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                                     alt="User upload"
                                     fill
                                     draggable={false}
-                                    className="pointer-events-none"
+                                    className="pointer-events-none object-contain"
                                 />
                             )}
                             {layer.type === 'text' && (
@@ -395,11 +487,12 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                                     contentEditable
                                     suppressContentEditableWarning
                                     onBlur={(e) => updateLayer(layer.id, { content: e.currentTarget.textContent || '' })}
-                                    className="w-full h-full pointer-events-auto bg-transparent focus:outline-none text-3xl font-bold cursor-text"
+                                    className="w-full h-full pointer-events-auto bg-transparent focus:outline-none text-3xl font-bold cursor-text flex items-center justify-center text-center"
                                     style={{
                                         color: layer.color,
                                         fontFamily: layer.fontFamily,
-                                        textShadow: '2px 2px 4px rgba(0,0,0,0.7)'
+                                        textShadow: '2px 2px 4px rgba(0,0,0,0.7)',
+                                        fontSize: '2rem' // Scale will handle the sizing
                                     }}
                                 >
                                     {layer.content}
@@ -412,7 +505,46 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                     ))}
                 </div>
                 <div id="image-controls" className="flex flex-col items-center gap-6 pt-4">
-                     {activeLayer && (
+                     <div className="flex flex-wrap justify-center gap-2">
+                        <Button variant={tool === 'move' ? 'secondary' : 'outline'} onClick={() => setTool('move')} disabled={isSaving}>
+                            <Move className="mr-2 h-4 w-4" /> Move
+                        </Button>
+                        <Button variant={tool === 'pen' ? 'secondary' : 'outline'} onClick={() => setTool('pen')} disabled={isSaving}>
+                            <Pen className="mr-2 h-4 w-4" /> Pen
+                        </Button>
+                        <Button variant={tool === 'brush' ? 'secondary' : 'outline'} onClick={() => setTool('brush')} disabled={isSaving}>
+                            <Paintbrush className="mr-2 h-4 w-4" /> Brush
+                        </Button>
+                     </div>
+
+                     {(tool === 'pen' || tool === 'brush') && (
+                       <div className="w-full sm:w-[80%] flex flex-col items-center gap-4">
+                          <div className="w-full sm:w-64 flex flex-col gap-4">
+                              <div className="grid w-full items-center gap-2">
+                                  <Label htmlFor="brush-size" className="flex items-center gap-2"><ZoomIn className="h-4 w-4" /> Brush Size</Label>
+                                  <Slider
+                                      id="brush-size"
+                                      value={[brushSize]}
+                                      min={1} max={50} step={1}
+                                      onValueChange={(value) => setBrushSize(value[0])}
+                                      disabled={isSaving}
+                                  />
+                              </div>
+                              <div className="grid w-full items-center gap-2">
+                                  <Label htmlFor="brush-color" className="flex items-center gap-2"><Palette className="h-4 w-4" /> Brush Color</Label>
+                                  <Input
+                                      id="brush-color" type="color"
+                                      value={brushColor}
+                                      onChange={(e) => setBrushColor(e.target.value)}
+                                      className="p-1 h-10 w-full"
+                                      disabled={isSaving}
+                                  />
+                              </div>
+                          </div>
+                       </div>
+                     )}
+
+                     {activeLayer && tool === 'move' && (
                        <div className="w-full sm:w-[80%] flex flex-col items-center gap-4">
                           <div className="w-full sm:w-64 flex flex-col gap-4">
                               <div className="grid w-full items-center gap-2">
@@ -420,9 +552,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                                   <Slider
                                       id="scale-slider"
                                       value={[activeLayer.scale]}
-                                      min={0.1}
-                                      max={5}
-                                      step={0.05}
+                                      min={0.1} max={5} step={0.05}
                                       onValueChange={(value) => updateLayer(activeLayer.id, { scale: value[0] })}
                                       disabled={isSaving}
                                   />
@@ -432,9 +562,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                                   <Slider
                                       id="tilt-slider"
                                       value={[activeLayer.rotation]}
-                                      min={-180}
-                                      max={180}
-                                      step={1}
+                                      min={-180} max={180} step={1}
                                       onValueChange={(value) => updateLayer(activeLayer.id, { rotation: value[0] })}
                                       disabled={isSaving}
                                   />
@@ -444,8 +572,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                                     <div className="grid w-full items-center gap-2">
                                         <Label htmlFor="color-picker" className="flex items-center gap-2"><Palette className="h-4 w-4" /> Color</Label>
                                         <Input
-                                            id="color-picker"
-                                            type="color"
+                                            id="color-picker" type="color"
                                             value={activeLayer.color || '#ffffff'}
                                             onChange={(e) => updateLayer(activeLayer.id, { color: e.target.value })}
                                             className="p-1 h-10 w-full"
@@ -477,12 +604,12 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                           </div>
                        </div>
                      )}
-                     <div className="flex flex-wrap justify-center gap-2">
+                     <div className="flex flex-wrap justify-center gap-2 pt-4 border-t w-full">
                         <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isSaving}>
                             <UploadCloud className="mr-2 h-4 w-4" />
                             Add Image
                         </Button>
-                        <Button variant="outline" onClick={() => addLayer('text', 'Edit Me', { width: 150, height: 40 })} disabled={isSaving}>
+                        <Button variant="outline" onClick={() => addLayer('text', 'Edit Me', { width: 200, height: 50 })} disabled={isSaving}>
                             <Text className="mr-2 h-4 w-4" />
                             Add Text
                         </Button>
@@ -504,15 +631,13 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                                 </div>
                             </PopoverContent>
                         </Popover>
-                         {activeLayer && activeLayer.type === 'image' && (
+                         {activeLayer && activeLayer.type === 'image' && tool === 'move' && (
                             <Button variant="outline" onClick={handleRemoveBackground} disabled={isSaving}>
                                 <ImageOff className="mr-2 h-4 w-4" />
                                 Remove BG
                             </Button>
                         )}
-                     </div>
-                     <div className="flex flex-wrap justify-center gap-2 pt-4 border-t w-full">
-                        <Button onClick={saveImage} disabled={isSaving || layers.length === 0}>
+                        <Button onClick={saveImage} disabled={isSaving || (layers.length === 0)}>
                             {isSaving ? (
                                 <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                             ) : (
