@@ -4,7 +4,7 @@ import { useState, useRef, type DragEvent, type MouseEvent as ReactMouseEvent, u
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { UploadCloud, Download, RefreshCw, ZoomIn, RotateCw, WandSparkles, ChevronLeft, ChevronRight, Text, Smile, Trash2 } from 'lucide-react';
+import { UploadCloud, Download, RefreshCw, ZoomIn, RotateCw, WandSparkles, ChevronLeft, ChevronRight, Text, Smile, Move, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import html2canvas from 'html2canvas';
 import { Slider } from '@/components/ui/slider';
@@ -343,7 +343,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                                 </Button>
                             </>
                         )}
-                        {!generatedImage && layers.map((layer) => (
+                        {!generatedImage && layers.map((layer, index) => (
                              <div
                                 key={layer.id}
                                 className={cn(
@@ -357,9 +357,27 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                                   width: `${layer.width * layer.scale}px`,
                                   height: `${layer.height * layer.scale}px`,
                                   transform: `rotate(${layer.rotation}deg)`,
+                                  zIndex: index + 1
                                 }}
                                 onMouseDown={(e) => onLayerMouseDown(e, layer.id)}
                             >
+                                {activeLayerId === layer.id && !generatedImage && (
+                                  <>
+                                    <div
+                                      title="Move"
+                                      className="absolute -top-3 -left-3 bg-primary text-primary-foreground rounded-full p-0.5 cursor-move z-20"
+                                    >
+                                      <Move className="w-3 h-3" />
+                                    </div>
+                                    <div
+                                      title="Delete"
+                                      className="absolute -top-3 -right-3 bg-destructive text-destructive-foreground rounded-full p-0.5 cursor-pointer hover:scale-110 transition-transform z-20"
+                                      onMouseDown={(e) => { e.stopPropagation(); deleteActiveLayer(); }}
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </div>
+                                  </>
+                                )}
                                 {layer.type === 'image' && (
                                     <Image
                                         src={layer.content}
@@ -487,11 +505,6 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                                     </PopoverContent>
                                 </Popover>
                                 </>
-                            )}
-                             {activeLayer && !generatedImage && (
-                                <Button variant="destructive" size="icon" onClick={deleteActiveLayer} disabled={isGenerating || isSaving}>
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
                             )}
                          </div>
                          <div className="flex flex-wrap justify-center gap-2 pt-4 border-t w-full">
