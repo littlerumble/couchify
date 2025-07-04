@@ -101,7 +101,6 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
       const reader = new FileReader();
       reader.onloadend = () => {
         const result = reader.result as string;
-        handleReset();
         const img = document.createElement('img');
         img.src = result;
         img.onload = () => {
@@ -119,7 +118,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
             width: newWidth,
             height: newHeight,
           };
-          setLayers([newLayer]);
+          setLayers(prev => [...prev, newLayer]);
           setActiveLayerId(newLayer.id);
         }
       };
@@ -136,6 +135,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       handleFile(e.target.files[0]);
+      e.target.value = '';
     }
   };
   
@@ -298,232 +298,231 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
   return (
     <Card className="w-full max-w-4xl mx-auto shadow-lg overflow-hidden">
         <CardContent className="p-4 sm:p-6">
-            {layers.length === 0 && !generatedImage ? (
+            <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleInputChange} multiple={false} />
+            <div className="space-y-4">
                 <div 
-                    onDrop={handleDrop} 
+                    ref={canvasRef}
+                    className="relative w-full aspect-video bg-cover bg-center bg-no-repeat overflow-hidden rounded-lg group/canvas"
+                    style={{ backgroundImage: `url(${generatedImage || backgroundImages[currentBgIndex]})` }}
+                    onMouseMove={onMouseMove}
+                    onMouseUp={onMouseUpOrLeave}
+                    onMouseLeave={onMouseUpOrLeave}
+                    onMouseDown={onCanvasMouseDown}
+                    onDrop={handleDrop}
                     onDragOver={handleDragOver}
-                    className="border-2 border-dashed border-border rounded-lg p-8 flex flex-col items-center justify-center text-center bg-secondary/30 h-[250px] sm:h-[400px]"
                 >
-                    <UploadCloud className="h-12 w-12 text-muted-foreground mb-4" />
-                    <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleInputChange} />
-                    <p className="text-muted-foreground mb-2">Drag & Drop your image here</p>
-                    <p className="text-muted-foreground text-sm mb-4">or</p>
-                    <Button type="button" onClick={() => fileInputRef.current?.click()}>Upload Image</Button>
+                    {layers.length === 0 && !generatedImage && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-muted-foreground pointer-events-none p-4">
+                            <UploadCloud className="h-12 w-12 mb-4" />
+                            <p>Drag & Drop an image here, or click "Add Image" below</p>
+                        </div>
+                    )}
+                    {backgroundImages.length > 1 && !generatedImage && (
+                        <>
+                            <Button 
+                                variant="outline" 
+                                size="icon" 
+                                className="absolute left-2 top-1/2 -translate-y-1/2 z-20 opacity-0 group-hover/canvas:opacity-100 transition-opacity"
+                                onClick={handlePrevBg}
+                                disabled={isGenerating || isSaving}
+                            >
+                                <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                                variant="outline" 
+                                size="icon" 
+                                className="absolute right-2 top-1/2 -translate-y-1/2 z-20 opacity-0 group-hover/canvas:opacity-100 transition-opacity"
+                                onClick={handleNextBg}
+                                disabled={isGenerating || isSaving}
+                            >
+                                <ChevronRight className="h-4 w-4" />
+                            </Button>
+                        </>
+                    )}
+                    {!generatedImage && layers.map((layer, index) => (
+                         <div
+                            key={layer.id}
+                            className={cn(
+                                'absolute select-none layer-wrapper',
+                                {'cursor-move': isInteracting && activeLayerId === layer.id},
+                                {'ring-2 ring-primary ring-offset-2 ring-offset-background': activeLayerId === layer.id},
+                            )}
+                            style={{ 
+                              top: `${layer.position.y}px`, 
+                              left: `${layer.position.x}px`,
+                              width: `${layer.width * layer.scale}px`,
+                              height: `${layer.height * layer.scale}px`,
+                              transform: `rotate(${layer.rotation}deg)`,
+                              zIndex: index + 1
+                            }}
+                            onMouseDown={(e) => onLayerMouseDown(e, layer.id)}
+                        >
+                            {activeLayerId === layer.id && !generatedImage && (
+                              <>
+                                <div
+                                  title="Move"
+                                  className="absolute -top-3 -left-3 bg-primary text-primary-foreground rounded-full p-0.5 cursor-move z-20"
+                                >
+                                  <Move className="w-3 h-3" />
+                                </div>
+                                <div
+                                  title="Delete"
+                                  className="absolute -top-3 -right-3 bg-destructive text-destructive-foreground rounded-full p-0.5 cursor-pointer hover:scale-110 transition-transform z-20"
+                                  onMouseDown={(e) => { e.stopPropagation(); deleteActiveLayer(); }}
+                                >
+                                  <X className="w-3 h-3" />
+                                </div>
+                              </>
+                            )}
+                            {layer.type === 'image' && (
+                                <Image
+                                    src={layer.content}
+                                    alt="User upload"
+                                    fill
+                                    draggable={false}
+                                    className="pointer-events-none"
+                                />
+                            )}
+                            {layer.type === 'text' && (
+                                <div
+                                    contentEditable
+                                    suppressContentEditableWarning
+                                    onBlur={(e) => updateLayer(layer.id, { content: e.currentTarget.textContent || '' })}
+                                    className="w-full h-full pointer-events-auto bg-transparent focus:outline-none text-3xl font-bold text-white cursor-text"
+                                    style={{textShadow: '2px 2px 4px rgba(0,0,0,0.7)'}}
+                                >
+                                    {layer.content}
+                                </div>
+                            )}
+                            {layer.type === 'sticker' && (
+                                 <layer.content className="w-full h-full pointer-events-none" />
+                            )}
+                        </div>
+                    ))}
                 </div>
-            ) : (
-                <div className="space-y-4">
-                    <div 
-                        ref={canvasRef}
-                        className="relative w-full aspect-video bg-cover bg-center bg-no-repeat overflow-hidden rounded-lg group/canvas"
-                        style={{ backgroundImage: `url(${generatedImage || backgroundImages[currentBgIndex]})` }}
-                        onMouseMove={onMouseMove}
-                        onMouseUp={onMouseUpOrLeave}
-                        onMouseLeave={onMouseUpOrLeave}
-                        onMouseDown={onCanvasMouseDown}
-                    >
-                        {backgroundImages.length > 1 && !generatedImage && (
+                <div id="image-controls" className="flex flex-col items-center gap-6 pt-4">
+                     {activeLayer && !generatedImage && (
+                       <div className="w-full sm:w-[80%] flex flex-col items-center gap-4">
+                          <div className="w-full sm:w-64 flex flex-col gap-4">
+                              <div className="grid w-full items-center gap-2">
+                                  <Label htmlFor="size-slider" className="flex items-center gap-2"><ZoomIn className="h-4 w-4" /> Size</Label>
+                                  <Slider
+                                      id="size-slider"
+                                      value={[activeLayer.scale]}
+                                      min={0.1}
+                                      max={5}
+                                      step={0.05}
+                                      onValueChange={(value) => updateLayer(activeLayer.id, { scale: value[0] })}
+                                      disabled={isGenerating || isSaving}
+                                  />
+                              </div>
+                              <div className="grid w-full items-center gap-2">
+                                  <Label htmlFor="tilt-slider" className="flex items-center gap-2"><RotateCw className="h-4 w-4" /> Tilt</Label>
+                                  <Slider
+                                      id="tilt-slider"
+                                      value={[activeLayer.rotation]}
+                                      min={-180}
+                                      max={180}
+                                      step={1}
+                                      onValueChange={(value) => updateLayer(activeLayer.id, { rotation: value[0] })}
+                                      disabled={isGenerating || isSaving}
+                                  />
+                              </div>
+                          </div>
+                       </div>
+                     )}
+                     <div className="flex flex-wrap justify-center gap-2">
+                        {!generatedImage && (
                             <>
-                                <Button 
-                                    variant="outline" 
-                                    size="icon" 
-                                    className="absolute left-2 top-1/2 -translate-y-1/2 z-20 opacity-0 group-hover/canvas:opacity-100 transition-opacity"
-                                    onClick={handlePrevBg}
-                                    disabled={isGenerating || isSaving}
-                                >
-                                    <ChevronLeft className="h-4 w-4" />
-                                </Button>
-                                <Button 
-                                    variant="outline" 
-                                    size="icon" 
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 z-20 opacity-0 group-hover/canvas:opacity-100 transition-opacity"
-                                    onClick={handleNextBg}
-                                    disabled={isGenerating || isSaving}
-                                >
-                                    <ChevronRight className="h-4 w-4" />
-                                </Button>
+                            <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isGenerating || isSaving}>
+                                <UploadCloud className="mr-2 h-4 w-4" />
+                                Add Image
+                            </Button>
+                            <Button variant="outline" onClick={() => addLayer('text', 'Edit Me', { width: 150, height: 40 })} disabled={isGenerating || isSaving}>
+                                <Text className="mr-2 h-4 w-4" />
+                                Add Text
+                            </Button>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" disabled={isGenerating || isSaving}>
+                                        <Smile className="mr-2 h-4 w-4" />
+                                        Add Sticker
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-48">
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {stickers.map(sticker => (
+                                            <Button key={sticker.name} variant="ghost" className="h-auto p-2 flex flex-col gap-1" onClick={() => addLayer('sticker', sticker.component, { width: sticker.width, height: sticker.height })}>
+                                                <sticker.component className="w-10 h-10" />
+                                                <span className="text-xs">{sticker.name}</span>
+                                            </Button>
+                                        ))}
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
+
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="outline" disabled={isGenerating || isSaving}>
+                                        <WandSparkles className="mr-2 h-4 w-4" />
+                                        AI Edit
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-80">
+                                    <form onSubmit={(e) => { e.preventDefault(); handleMagic(); }}>
+                                        <div className="grid gap-4">
+                                            <div className="space-y-2">
+                                                <h4 className="font-medium leading-none">AI Magic</h4>
+                                                <p className="text-sm text-muted-foreground">
+                                                    Describe the change you want the AI to make.
+                                                </p>
+                                            </div>
+                                            <div className="grid gap-2">
+                                                <Label htmlFor="prompt-input">Your Prompt</Label>
+                                                <Textarea
+                                                    id="prompt-input"
+                                                    placeholder="e.g. 'turn the scene into a comic book style'"
+                                                    value={prompt}
+                                                    onChange={(e) => setPrompt(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                                        e.preventDefault();
+                                                        handleMagic();
+                                                    }
+                                                    }}
+                                                />
+                                            </div>
+                                            <Button type="submit" disabled={isGenerating || !prompt}>
+                                                {isGenerating ? (
+                                                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                                                ) : (
+                                                <WandSparkles className="mr-2 h-4 w-4" />
+                                                )}
+                                                Generate
+                                            </Button>
+                                        </div>
+                                    </form>
+                                </PopoverContent>
+                            </Popover>
                             </>
                         )}
-                        {!generatedImage && layers.map((layer, index) => (
-                             <div
-                                key={layer.id}
-                                className={cn(
-                                    'absolute select-none layer-wrapper',
-                                    {'cursor-move': isInteracting && activeLayerId === layer.id},
-                                    {'ring-2 ring-primary ring-offset-2 ring-offset-background': activeLayerId === layer.id},
-                                )}
-                                style={{ 
-                                  top: `${layer.position.y}px`, 
-                                  left: `${layer.position.x}px`,
-                                  width: `${layer.width * layer.scale}px`,
-                                  height: `${layer.height * layer.scale}px`,
-                                  transform: `rotate(${layer.rotation}deg)`,
-                                  zIndex: index + 1
-                                }}
-                                onMouseDown={(e) => onLayerMouseDown(e, layer.id)}
-                            >
-                                {activeLayerId === layer.id && !generatedImage && (
-                                  <>
-                                    <div
-                                      title="Move"
-                                      className="absolute -top-3 -left-3 bg-primary text-primary-foreground rounded-full p-0.5 cursor-move z-20"
-                                    >
-                                      <Move className="w-3 h-3" />
-                                    </div>
-                                    <div
-                                      title="Delete"
-                                      className="absolute -top-3 -right-3 bg-destructive text-destructive-foreground rounded-full p-0.5 cursor-pointer hover:scale-110 transition-transform z-20"
-                                      onMouseDown={(e) => { e.stopPropagation(); deleteActiveLayer(); }}
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </div>
-                                  </>
-                                )}
-                                {layer.type === 'image' && (
-                                    <Image
-                                        src={layer.content}
-                                        alt="User upload"
-                                        fill
-                                        draggable={false}
-                                        className="pointer-events-none"
-                                    />
-                                )}
-                                {layer.type === 'text' && (
-                                    <div
-                                        contentEditable
-                                        suppressContentEditableWarning
-                                        onBlur={(e) => updateLayer(layer.id, { content: e.currentTarget.textContent || '' })}
-                                        className="w-full h-full pointer-events-auto bg-transparent focus:outline-none text-3xl font-bold text-white cursor-text"
-                                        style={{textShadow: '2px 2px 4px rgba(0,0,0,0.7)'}}
-                                    >
-                                        {layer.content}
-                                    </div>
-                                )}
-                                {layer.type === 'sticker' && (
-                                     <layer.content className="w-full h-full pointer-events-none" />
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                    <div id="image-controls" className="flex flex-col items-center gap-6 pt-4">
-                         {activeLayer && !generatedImage && (
-                           <div className="w-full sm:w-[80%] flex flex-col items-center gap-4">
-                              <div className="w-full sm:w-64 flex flex-col gap-4">
-                                  <div className="grid w-full items-center gap-2">
-                                      <Label htmlFor="size-slider" className="flex items-center gap-2"><ZoomIn className="h-4 w-4" /> Size</Label>
-                                      <Slider
-                                          id="size-slider"
-                                          value={[activeLayer.scale]}
-                                          min={0.1}
-                                          max={5}
-                                          step={0.05}
-                                          onValueChange={(value) => updateLayer(activeLayer.id, { scale: value[0] })}
-                                          disabled={isGenerating || isSaving}
-                                      />
-                                  </div>
-                                  <div className="grid w-full items-center gap-2">
-                                      <Label htmlFor="tilt-slider" className="flex items-center gap-2"><RotateCw className="h-4 w-4" /> Tilt</Label>
-                                      <Slider
-                                          id="tilt-slider"
-                                          value={[activeLayer.rotation]}
-                                          min={-180}
-                                          max={180}
-                                          step={1}
-                                          onValueChange={(value) => updateLayer(activeLayer.id, { rotation: value[0] })}
-                                          disabled={isGenerating || isSaving}
-                                      />
-                                  </div>
-                              </div>
-                           </div>
-                         )}
-                         <div className="flex flex-wrap justify-center gap-2">
-                            {!generatedImage && (
-                                <>
-                                <Button variant="outline" onClick={() => addLayer('text', 'Edit Me', { width: 150, height: 40 })} disabled={isGenerating || isSaving}>
-                                    <Text className="mr-2 h-4 w-4" />
-                                    Add Text
-                                </Button>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button variant="outline" disabled={isGenerating || isSaving}>
-                                            <Smile className="mr-2 h-4 w-4" />
-                                            Add Sticker
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-48">
-                                        <div className="grid grid-cols-3 gap-2">
-                                            {stickers.map(sticker => (
-                                                <Button key={sticker.name} variant="ghost" className="h-auto p-2 flex flex-col gap-1" onClick={() => addLayer('sticker', sticker.component, { width: sticker.width, height: sticker.height })}>
-                                                    <sticker.component className="w-10 h-10" />
-                                                    <span className="text-xs">{sticker.name}</span>
-                                                </Button>
-                                            ))}
-                                        </div>
-                                    </PopoverContent>
-                                </Popover>
-
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button variant="outline" disabled={isGenerating || isSaving}>
-                                            <WandSparkles className="mr-2 h-4 w-4" />
-                                            AI Edit
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-80">
-                                        <form onSubmit={(e) => { e.preventDefault(); handleMagic(); }}>
-                                            <div className="grid gap-4">
-                                                <div className="space-y-2">
-                                                    <h4 className="font-medium leading-none">AI Magic</h4>
-                                                    <p className="text-sm text-muted-foreground">
-                                                        Describe the change you want the AI to make.
-                                                    </p>
-                                                </div>
-                                                <div className="grid gap-2">
-                                                    <Label htmlFor="prompt-input">Your Prompt</Label>
-                                                    <Textarea
-                                                        id="prompt-input"
-                                                        placeholder="e.g. 'turn the scene into a comic book style'"
-                                                        value={prompt}
-                                                        onChange={(e) => setPrompt(e.target.value)}
-                                                        onKeyDown={(e) => {
-                                                        if (e.key === 'Enter' && !e.shiftKey) {
-                                                            e.preventDefault();
-                                                            handleMagic();
-                                                        }
-                                                        }}
-                                                    />
-                                                </div>
-                                                <Button type="submit" disabled={isGenerating || !prompt}>
-                                                    {isGenerating ? (
-                                                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                                                    ) : (
-                                                    <WandSparkles className="mr-2 h-4 w-4" />
-                                                    )}
-                                                    Generate
-                                                </Button>
-                                            </div>
-                                        </form>
-                                    </PopoverContent>
-                                </Popover>
-                                </>
+                     </div>
+                     <div className="flex flex-wrap justify-center gap-2 pt-4 border-t w-full">
+                        <Button onClick={saveImage} disabled={isGenerating || isSaving || layers.length === 0 && !generatedImage}>
+                            {isSaving ? (
+                                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <Download className="mr-2 h-4 w-4" />
                             )}
-                         </div>
-                         <div className="flex flex-wrap justify-center gap-2 pt-4 border-t w-full">
-                            <Button onClick={saveImage} disabled={isGenerating || isSaving}>
-                                {isSaving ? (
-                                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                    <Download className="mr-2 h-4 w-4" />
-                                )}
-                                Save
-                            </Button>
-                            <Button variant="outline" onClick={() => handleReset(false)} disabled={isGenerating || isSaving}>
-                                <RefreshCw className="mr-2 h-4 w-4" />
-                                Start Over
-                            </Button>
-                         </div>
-                    </div>
+                            Save
+                        </Button>
+                        <Button variant="outline" onClick={() => handleReset(false)} disabled={isGenerating || isSaving}>
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                            Start Over
+                        </Button>
+                     </div>
                 </div>
-            )}
+            </div>
         </CardContent>
     </Card>
   );
