@@ -10,7 +10,7 @@ import html2canvas from 'html2canvas';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { saveCreationToServer, removeBackground } from '@/app/actions';
+import { saveCreationToServer } from '@/app/actions';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
 import { BlingIcon, CigarIcon, CrownIcon, DealWithItGlassesIcon, MustacheIcon, TopHatIcon } from '@/components/icons';
@@ -43,7 +43,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
   const [isInteracting, setIsInteracting] = useState(false);
   const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
   
-  const [isRemovingBg, setIsRemovingBg] = useState(false);
+  const [replacingBgLayerId, setReplacingBgLayerId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [currentBgIndex, setCurrentBgIndex] = useState(0);
   const [editorStarted, setEditorStarted] = useState(false);
@@ -105,23 +105,34 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
         const img = document.createElement('img');
         img.src = result;
         img.onload = () => {
-          const aspectRatio = img.naturalWidth / img.naturalHeight;
-          const newWidth = 150;
-          const newHeight = newWidth / aspectRatio;
-          
-          const newLayer: Layer = {
-            id: uuidv4(),
-            type: 'image',
-            content: result,
-            position: { x: 50, y: 50 },
-            scale: 1,
-            rotation: 0,
-            width: newWidth,
-            height: newHeight,
-          };
-          setLayers(prev => [...prev, newLayer]);
-          setActiveLayerId(newLayer.id);
-          setEditorStarted(true);
+          if (replacingBgLayerId) {
+            updateLayer(replacingBgLayerId, { content: result });
+            setReplacingBgLayerId(null);
+            toast({
+              title: 'Image Replaced',
+              description: 'Your image has been updated with the new version.',
+            });
+          } else {
+            const aspectRatio = img.naturalWidth / img.naturalHeight;
+            const newWidth = 150;
+            const newHeight = newWidth / aspectRatio;
+            
+            const newLayer: Layer = {
+              id: uuidv4(),
+              type: 'image',
+              content: result,
+              position: { x: 50, y: 50 },
+              scale: 1,
+              rotation: 0,
+              width: newWidth,
+              height: newHeight,
+            };
+            setLayers(prev => [...prev, newLayer]);
+            setActiveLayerId(newLayer.id);
+            if (!editorStarted) {
+                setEditorStarted(true);
+            }
+          }
         }
       };
       reader.readAsDataURL(file);
@@ -243,28 +254,15 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
   
   const handleRemoveBackground = async () => {
     if (!activeLayer || activeLayer.type !== 'image') return;
-
-    setIsRemovingBg(true);
-    try {
-        const result = await removeBackground(activeLayer.content);
-        if (result.success && result.image) {
-            updateLayer(activeLayer.id, { content: result.image });
-            toast({
-                title: 'Success',
-                description: 'Background removed.',
-            });
-        } else {
-            throw new Error(result.error || 'Failed to remove background.');
-        }
-    } catch (error: any) {
-        toast({
-            title: 'Background Removal Failed',
-            description: error.message,
-            variant: 'destructive',
-        });
-    } finally {
-        setIsRemovingBg(false);
-    }
+    
+    setReplacingBgLayerId(activeLayer.id);
+    window.open('https://www.remove.bg/upload', '_blank');
+    
+    toast({
+        title: 'Ready for your new image?',
+        description: "Once you've downloaded from remove.bg, just drag the new file onto the canvas to replace the old one.",
+        duration: 9000,
+    });
   };
 
   const handlePrevBg = () => {
@@ -353,6 +351,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                                 'absolute select-none layer-wrapper',
                                 {'cursor-move': isInteracting && activeLayerId === layer.id},
                                 {'ring-2 ring-primary ring-offset-2 ring-offset-background': activeLayerId === layer.id},
+                                {'ring-blue-500': replacingBgLayerId === layer.id}
                             )}
                             style={{ 
                               top: `${layer.position.y}px`, 
@@ -505,12 +504,8 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                             </PopoverContent>
                         </Popover>
                          {activeLayer && activeLayer.type === 'image' && (
-                            <Button variant="outline" onClick={handleRemoveBackground} disabled={isRemovingBg || isSaving}>
-                                {isRemovingBg ? (
-                                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                    <ImageOff className="mr-2 h-4 w-4" />
-                                )}
+                            <Button variant="outline" onClick={handleRemoveBackground} disabled={isSaving}>
+                                <ImageOff className="mr-2 h-4 w-4" />
                                 Remove BG
                             </Button>
                         )}
