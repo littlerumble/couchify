@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useRef, type DragEvent, type MouseEvent as ReactMouseEvent, useMemo, useEffect } from 'react';
+import { useState, useRef, type DragEvent, type MouseEvent as ReactMouseEvent, type TouchEvent as ReactTouchEvent, useMemo, useEffect } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -36,6 +36,8 @@ interface Layer {
 interface ImageEditorProps {
   backgroundImages: string[];
 }
+
+type Point = { clientX: number; clientY: number };
 
 export function ImageEditor({ backgroundImages }: ImageEditorProps) {
   const [layers, setLayers] = useState<Layer[]>([]);
@@ -194,10 +196,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
     e.stopPropagation();
   };
 
-  const onLayerMouseDown = (e: ReactMouseEvent<HTMLDivElement>, layerId: string) => {
-    if (tool !== 'move') return;
-    e.stopPropagation();
-
+  const handleLayerInteractionStart = (point: Point, layerId: string) => {
     setActiveLayerId(layerId);
     setIsInteracting(true);
     
@@ -205,13 +204,44 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
     if (!layer || !canvasRef.current) return;
 
     const canvasRect = canvasRef.current.getBoundingClientRect();
-    const clickXInCanvas = e.clientX - canvasRect.left;
-    const clickYInCanvas = e.clientY - canvasRect.top;
+    const clickXInCanvas = point.clientX - canvasRect.left;
+    const clickYInCanvas = point.clientY - canvasRect.top;
     
     setDragStartOffset({
       x: clickXInCanvas - layer.position.x,
       y: clickYInCanvas - layer.position.y,
     });
+  };
+
+  const onLayerMouseDown = (e: ReactMouseEvent<HTMLDivElement>, layerId: string) => {
+    if (tool !== 'move') return;
+    e.stopPropagation();
+    handleLayerInteractionStart(e, layerId);
+  };
+
+  const onLayerTouchStart = (e: ReactTouchEvent<HTMLDivElement>, layerId: string) => {
+    if (tool !== 'move' || e.touches.length === 0) return;
+    e.stopPropagation();
+    handleLayerInteractionStart(e.touches[0], layerId);
+  };
+
+  const startDrawing = (point: Point) => {
+    const canvas = drawingCanvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    
+    setIsDrawing(true);
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = point.clientX - rect.left;
+    const y = point.clientY - rect.top;
+    
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.strokeStyle = brushColor;
+    ctx.lineWidth = tool === 'brush' ? brushSize * 1.5 : brushSize;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
   };
 
   const onCanvasMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
@@ -223,26 +253,18 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
     }
   }
 
-  const startDrawing = (e: ReactMouseEvent<HTMLDivElement>) => {
-    const canvas = drawingCanvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx) return;
-    
-    setIsDrawing(true);
-    
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.strokeStyle = brushColor;
-    ctx.lineWidth = tool === 'brush' ? brushSize * 1.5 : brushSize;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-  };
+  const onCanvasTouchStart = (e: ReactTouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 0) return;
+    if (tool === 'move') {
+      if ((e.target as HTMLElement).closest('.layer-wrapper')) return;
+      setActiveLayerId(null);
+    } else {
+      e.preventDefault();
+      startDrawing(e.touches[0]);
+    }
+  }
 
-  const draw = (e: ReactMouseEvent<HTMLDivElement>) => {
+  const draw = (point: Point) => {
     if (!isDrawing) return;
     
     const canvas = drawingCanvasRef.current;
@@ -250,8 +272,8 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
     if (!canvas || !ctx) return;
     
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = point.clientX - rect.left;
+    const y = point.clientY - rect.top;
     
     ctx.lineTo(x, y);
     ctx.stroke();
@@ -266,24 +288,35 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
     setIsDrawing(false);
   };
 
-  const onMouseMove = (e: ReactMouseEvent<HTMLDivElement>) => {
+  const handleMove = (point: Point) => {
     if (tool === 'move') {
-      if (!isInteracting || !activeLayer || !canvasRef.current) return;
-      e.preventDefault();
-      const canvasRect = canvasRef.current.getBoundingClientRect();
-      
-      const renderedWidth = activeLayer.width * activeLayer.scale;
-      const renderedHeight = activeLayer.height * activeLayer.scale;
-      
-      let newX = e.clientX - canvasRect.left - dragStartOffset.x;
-      let newY = e.clientY - canvasRect.top - dragStartOffset.y;
-      
-      newX = Math.max(0, Math.min(newX, canvasRect.width - renderedWidth));
-      newY = Math.max(0, Math.min(newY, canvasRect.height - renderedHeight));
+        if (!isInteracting || !activeLayer || !canvasRef.current) return;
+        
+        const canvasRect = canvasRef.current.getBoundingClientRect();
+        
+        const renderedWidth = activeLayer.width * activeLayer.scale;
+        const renderedHeight = activeLayer.height * activeLayer.scale;
+        
+        let newX = point.clientX - canvasRect.left - dragStartOffset.x;
+        let newY = point.clientY - canvasRect.top - dragStartOffset.y;
+        
+        newX = Math.max(0, Math.min(newX, canvasRect.width - renderedWidth));
+        newY = Math.max(0, Math.min(newY, canvasRect.height - renderedHeight));
 
-      updateLayer(activeLayer.id, { position: { x: newX, y: newY } });
+        updateLayer(activeLayer.id, { position: { x: newX, y: newY } });
     } else {
-      draw(e);
+      draw(point);
+    }
+  }
+
+  const onMouseMove = (e: ReactMouseEvent<HTMLDivElement>) => {
+    handleMove(e);
+  };
+
+  const onTouchMove = (e: ReactTouchEvent<HTMLDivElement>) => {
+    if (e.touches.length > 0) {
+        e.preventDefault();
+        handleMove(e.touches[0]);
     }
   };
 
@@ -404,6 +437,10 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                     onMouseUp={onMouseUpOrLeave}
                     onMouseLeave={onMouseUpOrLeave}
                     onMouseDown={onCanvasMouseDown}
+                    onTouchStart={onCanvasTouchStart}
+                    onTouchMove={onTouchMove}
+                    onTouchEnd={onMouseUpOrLeave}
+                    onTouchCancel={onMouseUpOrLeave}
                     onDrop={handleDrop}
                     onDragOver={handleDragOver}
                 >
@@ -462,6 +499,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                               zIndex: index + 1
                             }}
                             onMouseDown={(e) => onLayerMouseDown(e, layer.id)}
+                            onTouchStart={(e) => onLayerTouchStart(e, layer.id)}
                         >
                             {activeLayerId === layer.id && tool === 'move' && (
                               <>
