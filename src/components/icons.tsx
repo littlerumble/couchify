@@ -47,3 +47,42 @@ export function TopHatIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+export function MustacheIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 200 60" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <path d="M10,50 C20,20 80,20 100,50 C120,20 180,20 190,50 C190,50 160,60 100,60 C40,60 10,50 10,50 Z" stroke="currentColor" strokeWidth="3" fill="currentColor" />
+    </svg>
+  );
+}
+
+export function CigarIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 100 30" xmlns="http://www.w3.org/2000/svg" {...props}>
+      <g transform="rotate(-15 50 15)">
+        <rect x="5" y="10" width="80" height="10" fill="#8B4513" rx="2" />
+        <rect x="0" y="8" width="15" height="14" fill="#CD853F" rx="2" />
+        <path d="M85 12 Q 90 10, 92 7" stroke="gray" strokeWidth="1.5" fill="none" />
+        <path d="M85 15 Q 92 15, 95 13" stroke="gray" strokeWidth="1.5" fill="none" />
+        <path d="M85 18 Q 90 20, 92 23" stroke="gray" strokeWidth="1.5" fill="none" />
+      </g>
+    </svg>
+  );
+}
+
+export function BlingIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="gold" stroke="black" strokeWidth="2" {...props}>
+      <path d="M32,2 C48,2 58,16 52,26 L42,46 C52,56 40,62 32,62 C16,62 6,48 12,38 L22,18 C12,8 24,2 32,2 Z" />
+      <text x="32" y="44" fontFamily="Impact, sans-serif" fontSize="32" fill="black" textAnchor="middle" stroke="none">$</text>
+    </svg>
+  );
+}
+
+export function CrownIcon(props: SVGProps<SVGSVGElement>) {
+    return (
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="gold" stroke="black" strokeWidth="2" {...props}>
+            <path d="M10 50 L54 50 L58 20 L44 32 L32 10 L20 32 L6 20 L10 50 Z" />
+        </svg>
+    );
+}

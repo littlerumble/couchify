@@ -15,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { saveCreationToServer } from '@/app/actions';
 import { useRouter } from 'next/navigation';
 import { v4 as uuidv4 } from 'uuid';
-import { DealWithItGlassesIcon, TopHatIcon } from '@/components/icons';
+import { BlingIcon, CigarIcon, CrownIcon, DealWithItGlassesIcon, MustacheIcon, TopHatIcon } from '@/components/icons';
 import { cn } from '@/lib/utils';
 
 
@@ -153,7 +153,6 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
   };
 
   const onLayerMouseDown = (e: ReactMouseEvent<HTMLDivElement>, layerId: string) => {
-    e.preventDefault();
     e.stopPropagation();
     
     if (generatedImage) return;
@@ -290,6 +289,10 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
   const stickers = [
     { name: 'Glasses', component: DealWithItGlassesIcon, width: 80, height: 30 },
     { name: 'Top Hat', component: TopHatIcon, width: 80, height: 70 },
+    { name: 'Mustache', component: MustacheIcon, width: 80, height: 24 },
+    { name: 'Cigar', component: CigarIcon, width: 60, height: 18 },
+    { name: 'Bling', component: BlingIcon, width: 60, height: 60 },
+    { name: 'Crown', component: CrownIcon, width: 70, height: 50 },
   ];
 
   return (
@@ -345,7 +348,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                                 key={layer.id}
                                 className={cn(
                                     'absolute select-none layer-wrapper',
-                                    {'cursor-move': isInteracting},
+                                    {'cursor-move': isInteracting && activeLayerId === layer.id},
                                     {'ring-2 ring-primary ring-offset-2 ring-offset-background': activeLayerId === layer.id},
                                 )}
                                 style={{ 
@@ -371,7 +374,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                                         contentEditable
                                         suppressContentEditableWarning
                                         onBlur={(e) => updateLayer(layer.id, { content: e.currentTarget.textContent || '' })}
-                                        className="w-full h-full pointer-events-auto bg-transparent focus:outline-none text-3xl font-bold text-white"
+                                        className="w-full h-full pointer-events-auto bg-transparent focus:outline-none text-3xl font-bold text-white cursor-text"
                                         style={{textShadow: '2px 2px 4px rgba(0,0,0,0.7)'}}
                                     >
                                         {layer.content}
@@ -428,8 +431,8 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
                                             Add Sticker
                                         </Button>
                                     </PopoverTrigger>
-                                    <PopoverContent className="w-40">
-                                        <div className="grid grid-cols-2 gap-2">
+                                    <PopoverContent className="w-48">
+                                        <div className="grid grid-cols-3 gap-2">
                                             {stickers.map(sticker => (
                                                 <Button key={sticker.name} variant="ghost" className="h-auto p-2 flex flex-col gap-1" onClick={() => addLayer('sticker', sticker.component, { width: sticker.width, height: sticker.height })}>
                                                     <sticker.component className="w-10 h-10" />
