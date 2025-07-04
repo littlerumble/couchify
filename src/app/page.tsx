@@ -27,16 +27,57 @@ async function getBase64Image() {
   }
 }
 
-export default async function Home() {
-  const baseImageSrc = await getBase64Image();
-
-  const recentCreations = [
+async function getRecentCreations() {
+  const genImagePath = '/home/user/studio/gen_images';
+  const defaultCreations = [
     { src: 'https://placehold.co/600x400.png', hint: 'couch meme' },
     { src: 'https://placehold.co/600x400.png', hint: 'funny edit' },
     { src: 'https://placehold.co/600x400.png', hint: 'surreal art' },
     { src: 'https://placehold.co/600x400.png', hint: 'photo collage' },
     { src: 'https://placehold.co/600x400.png', hint: 'abstract scene' },
   ];
+
+  try {
+    await fs.mkdir(genImagePath, { recursive: true });
+    
+    const imageFiles = await fs.readdir(genImagePath);
+
+    const sortedFiles = (await Promise.all(
+      imageFiles.map(async (file) => ({
+        file,
+        stats: await fs.stat(path.join(genImagePath, file)),
+      }))
+    ))
+      .sort((a, b) => b.stats.mtime.getTime() - a.stats.mtime.getTime())
+      .map((item) => item.file);
+      
+    const creations = await Promise.all(
+      sortedFiles.slice(0, 5).map(async (file) => {
+        const imagePath = path.join(genImagePath, file);
+        const imageBuffer = await fs.readFile(imagePath);
+        const base64Image = imageBuffer.toString('base64');
+        const mimeType = file.endsWith('.png') ? 'image/png' : 'image/jpeg';
+        return {
+          src: `data:${mimeType};base64,${base64Image}`,
+          hint: 'user creation'
+        };
+      })
+    );
+    
+    if (creations.length > 0) {
+        return creations;
+    }
+    return defaultCreations;
+
+  } catch (error) {
+    console.error("Failed to read recent creations:", error);
+    return defaultCreations;
+  }
+}
+
+export default async function Home() {
+  const baseImageSrc = await getBase64Image();
+  const recentCreations = await getRecentCreations();
 
   return (
     <div className="flex flex-col min-h-dvh bg-background text-foreground">
