@@ -4,14 +4,7 @@ import path from 'path';
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
 import { ImageEditor } from '@/components/image-editor';
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel"
-import { Card, CardContent } from "@/components/ui/card"
+import { CreationsCarousel } from '@/components/creations-carousel';
 import Image from 'next/image';
 
 export const dynamic = 'force-dynamic';
@@ -149,36 +142,7 @@ export default async function Home() {
                     <p className="text-muted-foreground md:text-lg">
                         See what the community has been creating on the couch.
                     </p>
-                    <Carousel
-                        opts={{
-                            align: "start",
-                            loop: true,
-                        }}
-                        className="w-full"
-                    >
-                        <CarouselContent>
-                            {recentCreations.map((creation, index) => (
-                                <CarouselItem key={index} className="md:basis-1/2 lg:basis-1/3">
-                                    <div className="p-1">
-                                        <Card>
-                                            <CardContent className="flex aspect-video items-center justify-center p-0 overflow-hidden rounded-lg">
-                                                <Image 
-                                                    src={creation.src} 
-                                                    alt={`Creation ${index + 1}`} 
-                                                    width={600} 
-                                                    height={400}
-                                                    className="w-full h-full object-cover"
-                                                    data-ai-hint={creation.hint}
-                                                />
-                                            </CardContent>
-                                        </Card>
-                                    </div>
-                                </CarouselItem>
-                            ))}
-                        </CarouselContent>
-                        <CarouselPrevious />
-                        <CarouselNext />
-                    </Carousel>
+                    <CreationsCarousel creations={recentCreations} />
                 </div>
             </div>
         </section>
