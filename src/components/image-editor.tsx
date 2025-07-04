@@ -221,6 +221,7 @@ export function ImageEditor({ backgroundImages }: ImageEditorProps) {
 
   const onLayerTouchStart = (e: ReactTouchEvent<HTMLDivElement>, layerId: string) => {
     if (tool !== 'move' || e.touches.length === 0) return;
+    e.preventDefault();
     e.stopPropagation();
     handleLayerInteractionStart(e.touches[0], layerId);
   };
