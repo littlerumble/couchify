@@ -43,6 +43,8 @@ export async function removeBackground(imageDataUri: string): Promise<{ success:
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         // Standard Gradio API payload for file/image inputs
+        // Adding fn_index to make the request more explicit for some API versions.
+        fn_index: 0,
         data: [imageDataUri],
       }),
     });
