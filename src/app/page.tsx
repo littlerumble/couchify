@@ -9,6 +9,18 @@ import Image from 'next/image';
 
 export const dynamic = 'force-dynamic';
 
+async function getImageAsDataUri(filePath: string, fallback: string) {
+    try {
+        const imageBuffer = await fs.readFile(filePath);
+        const base64Image = imageBuffer.toString('base64');
+        const mimeType = path.extname(filePath) === '.png' ? 'image/png' : 'image/jpeg';
+        return `data:${mimeType};base64,${base64Image}`;
+    } catch (error) {
+        console.error(`Failed to read image at ${filePath}:`, error);
+        return fallback;
+    }
+}
+
 async function getBackgroundImages() {
   const couchImagesPath = '/home/user/studio/couch_images';
   const defaultImage = 'https://placehold.co/1280x720.png';
@@ -33,9 +45,9 @@ async function getBackgroundImages() {
     const backgroundUris = await Promise.all(
       imageFilesSorted.map(async (file) => {
         const imagePath = path.join(couchImagesPath, file);
+        const mimeType = file.endsWith('.png') ? 'image/png' : 'image/jpeg';
         const imageBuffer = await fs.readFile(imagePath);
         const base64Image = imageBuffer.toString('base64');
-        const mimeType = file.endsWith('.png') ? 'image/png' : 'image/jpeg';
         return `data:${mimeType};base64,${base64Image}`;
       })
     );
@@ -105,13 +117,19 @@ async function getRecentCreations() {
   }
 }
 
+async function getLogoSrc() {
+    const logoPath = path.join(process.cwd(), 'src', 'ai', '5989857315257436567.jpg');
+    return getImageAsDataUri(logoPath, 'https://placehold.co/24x24.png');
+}
+
 export default async function Home() {
   const backgroundImages = await getBackgroundImages();
   const recentCreations = await getRecentCreations();
+  const logoSrc = await getLogoSrc();
 
   return (
     <div className="flex flex-col min-h-dvh bg-background text-foreground">
-      <Header />
+      <Header logoSrc={logoSrc} />
       <main className="flex-1">
         <section id="home" className="relative w-full py-12 md:py-24 text-center overflow-hidden">
            <div className="absolute inset-0 bg-primary/10 -z-10"></div>
