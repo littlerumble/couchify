@@ -4,6 +4,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { revalidatePath } from 'next/cache';
+import { imageMagic } from '@/ai/flows/remove-background-flow';
 
 export async function saveCreationToServer(imageDataUri: string) {
   try {
@@ -33,40 +34,20 @@ export async function saveCreationToServer(imageDataUri: string) {
 }
 
 export async function removeBackground(imageDataUri: string): Promise<{ success: boolean; image?: string; error?: string }> {
-  // This server action calls a public Gradio API to remove the background from an image.
-  // Based on the API docs, the correct blocking endpoint for a web app is /run/image.
-  const API_URL = 'https://not-lain-background-removal.hf.space/run/image';
-
   try {
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        // The payload for this endpoint is a simple object with a 'data' array.
-        data: [imageDataUri],
-      }),
+    const result = await imageMagic({
+      photoDataUri: imageDataUri,
+      prompt: "Remove the background from this image, keeping only the main subject. Make the background transparent."
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      // Throw an error with details from the API if the request failed
-      throw new Error(`Background removal API failed with status: ${response.status}. Details: ${errorText}`);
+    if (!result.generatedImage) {
+      throw new Error('AI did not return an image.');
     }
 
-    const result = await response.json();
-
-    // The result is typically nested in a 'data' array in the response JSON
-    const outputImage = result?.data?.[0];
-
-    if (!outputImage) {
-      // If the response format is unexpected and doesn't contain an image
-      throw new Error('API did not return an image in the expected format.');
-    }
-
-    return { success: true, image: outputImage };
+    return { success: true, image: result.generatedImage };
 
   } catch (error: any) {
-    console.error('Failed to remove background:', error);
-    return { success: false, error: error.message || 'An unknown error occurred.' };
+    console.error('Failed to remove background with AI:', error);
+    return { success: false, error: error.message || 'An unknown error occurred during AI background removal.' };
   }
 }
